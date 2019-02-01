@@ -9,6 +9,8 @@ import vlc
 
 class music:
     def __init__(self, bot):
+        self.con = psycopg2.connect(database='musicdatabase',user='gigacorn',password='bplieb123',host='localhost',port='5432')
+        self.cur=self.con.cursor()
         self.opts={
                 'format':'bestaudio',
                 'outtmpl':'',
@@ -29,9 +31,17 @@ class music:
             print (e)
 
 
+
+
             
 
 client=commands.Bot(command_prefix=commands.when_mentioned_or("ia "))
 client.add_cog(music(client))
+
+@client.event
+async def on_message(message):
+    if message.author != client.user:
+        await client.send_message(message.channel, 'really rocks')
+
 
 client.run("NTQwMzM2ODcyNjczNTA5Mzc2.DzPdnQ.qRzQA3LGUTEdPsLotEj9dMLGxJY")
