@@ -78,6 +78,12 @@ client=commands.Bot(command_prefix=commands.when_mentioned_or("ia "))
 client.add_cog(music(client))
 
 @client.event
+async def on_ready():
+    print('Ready!')
+    print('User: '+str(client.user.name))
+    print('ID: '+str(client.user.id))
+
+@client.event
 async def on_message(message):
     if message.author != client.user:
         await client.send_message(message.channel, 'really rocks')
