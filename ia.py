@@ -17,7 +17,7 @@ class music:
         self.cur=self.con.cursor()
 
         # Set up audio task loop
-        self.bot.create_task(self.audio_loop())
+        self.bot.loop.create_task(self.audio_loop())
         self.player = vlc.Instance().media_player_new()
         self.player.event_manager().event_attach(vlc.EventType.MediaPlayerEndReached,self.song_finished)
         self.queue = asyncio.Queue()
