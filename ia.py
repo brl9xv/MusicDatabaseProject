@@ -1,14 +1,31 @@
+#***********************************************************************************#
+#                                   Modules/Imports                                 #
+#***********************************************************************************#
+
+# Async Imports
 from __future__ import unicode_literals
 import concurrent.futures
-import psycopg2
 import asyncio
+
+# Database Imports
+import psycopg2
+from database_info import *
+from token_info import TOKEN
+
+# Discord API
 import discord
 from discord.ext import commands
-import youtube_dl
-import vlc
-from database_info import *
 
-class music:
+# Media Player and Downloader
+import vlc
+import youtube_dl
+
+#***********************************************************************************#
+#                                   Main Class/Cog                                  #
+#***********************************************************************************#
+
+class Music:
+
     def __init__(self, bot):
         # Save reference to passed bot instance
         self.bot = bot
@@ -33,19 +50,6 @@ class music:
                 'postprocessors':[{'key':'FFmpegExtractAudio','preferredcodec':'m4a'}],
                 }
 
-    def song_finished(self, event):
-        if event.type == vlc.EventType.MediaPlayerEndReached:
-            self.next = True
-
-    async def download(self, key):
-        try:
-            self.opts['outtmpl'] = ('../Music/'+key+'.m4a')
-            with youtube_dl.YoutubeDL(self.opts) as ydl:
-                ydl.download(['https://www.youtube.com/?v='+key])
-        except(...):
-            print('Download error caught...')
-            print(e)
-
     async def audio_loop(self):
         while True:
             self.next = False
@@ -61,6 +65,23 @@ class music:
                 self.player.stop()
                 self.playing = False
 
+    def song_finished(self, event):
+        if event.type == vlc.EventType.MediaPlayerEndReached:
+            self.next = True
+
+#***********************************************************************************#
+#                                   Non-Commands                                    #
+#***********************************************************************************#
+
+    async def download(self, key):
+        try:
+            self.opts['outtmpl'] = ('../Music/'+key+'.m4a')
+            with youtube_dl.YoutubeDL(self.opts) as ydl:
+                ydl.download(['https://www.youtube.com/?v='+key])
+        except(...):
+            print('Download error caught...')
+            print(e)
+
     async def searchdb(self, content):
         cut = content.find(' ')
         param = content[:cut]
@@ -71,43 +92,9 @@ class music:
         self.cur.execute("select title, artist, genre, link from music where {0} like '%{1}%';".format(param,term))
         return self.cur.fetchall()
 
-    @commands.command(pass_context=True, no_pm=True)
-    async def play(self, ctx):
-        try:
-            results = await self.searchdb(ctx.message.content[9:])
-            if len(results) < 1:
-                await self.bot.send_message(ctx.message.channel,'No results...')
-            elif len(results) == 1:
-                await self.bot.send_message(ctx.message.channel,'Enqueing: '+results[0][0]+" - "+results[0][1])
-                await self.queue.put("../Music/"+results[0][3]+".m4a")
-            else:
-                await self.bot.send_message(ctx.message.channel,'Multiple results, pick a number or all...')
-                all_results = ''
-                for i in range(len(results)):
-                    all_results += str(i+1)+': '+results[i][0]+' - '+results[i][1]+'\n'
-                await self.bot.send_message(ctx.message.channel, all_results)
-                choice_m = await self.bot.wait_for_message(author=ctx.message.author)
-                choice = choice_m.content
-                if choice == 'all':
-                    await self.bot.send_message(ctx.message.channel,'Enqueing: all results')
-                    for r in results:
-                        await self.queue.put("../Music/"+r[3]+".m4a")
-                else:
-                    await self.bot.send_message(ctx.message.channel,'Enqueing: '+results[int(choice)-1][0])
-                    await self.queue.put("../Music/"+results[int(choice)-1][3]+".m4a")
-
-        except psycopg2.Error as e:
-            await self.bot.send_message(ctx.message.channel,'Error...')
-            print(e)
-
-    @commands.command(pass_context=True, no_pm=True)
-    async def skip(self, ctx):
-        if self.playing:
-            await self.bot.send_message(ctx.message.channel,'Skipping...')
-            self.next = True
-        else:
-            await self.bot.send_message(ctx.message.channel,'Nothing is playing...')
-
+#***********************************************************************************#
+#                               Database Control Commands                           #
+#***********************************************************************************#
     
     @commands.command(pass_context=True, no_pm=True)
     async def add(self, ctx):
@@ -152,11 +139,53 @@ class music:
             con.rollback()
             print(e)
 
+#***********************************************************************************#
+#                               Media Control Commands                              #
+#***********************************************************************************#
 
+    @commands.command(pass_context=True, no_pm=True)
+    async def play(self, ctx):
+        try:
+            results = await self.searchdb(ctx.message.content[9:])
+            if len(results) < 1:
+                await self.bot.send_message(ctx.message.channel,'No results...')
+            elif len(results) == 1:
+                await self.bot.send_message(ctx.message.channel,'Enqueing: '+results[0][0]+" - "+results[0][1])
+                await self.queue.put("../Music/"+results[0][3]+".m4a")
+            else:
+                await self.bot.send_message(ctx.message.channel,'Multiple results, pick a number or all...')
+                all_results = ''
+                for i in range(len(results)):
+                    all_results += str(i+1)+': '+results[i][0]+' - '+results[i][1]+'\n'
+                await self.bot.send_message(ctx.message.channel, all_results)
+                choice_m = await self.bot.wait_for_message(author=ctx.message.author)
+                choice = choice_m.content
+                if choice == 'all':
+                    await self.bot.send_message(ctx.message.channel,'Enqueing: all results')
+                    for r in results:
+                        await self.queue.put("../Music/"+r[3]+".m4a")
+                else:
+                    await self.bot.send_message(ctx.message.channel,'Enqueing: '+results[int(choice)-1][0])
+                    await self.queue.put("../Music/"+results[int(choice)-1][3]+".m4a")
 
+        except psycopg2.Error as e:
+            await self.bot.send_message(ctx.message.channel,'Error...')
+            print(e)
+
+    @commands.command(pass_context=True, no_pm=True)
+    async def skip(self, ctx):
+        if self.playing:
+            await self.bot.send_message(ctx.message.channel,'Skipping...')
+            self.next = True
+        else:
+            await self.bot.send_message(ctx.message.channel,'Nothing is playing...')
+
+#***********************************************************************************#
+#                           Discord Client Initialization                           #
+#***********************************************************************************#
 
 client=commands.Bot(command_prefix=commands.when_mentioned_or("ia "))
-client.add_cog(music(client))
+client.add_cog(Music(client))
 
 @client.event
 async def on_ready():
@@ -164,10 +193,5 @@ async def on_ready():
     print('User: '+str(client.user.name))
     print('ID: '+str(client.user.id))
 
-@client.event
-async def on_message(message):
-    if message.author != client.user:
-        await client.send_message(message.channel, 'really rocks')
-
-
-client.run("NTQwMzM2ODcyNjczNTA5Mzc2.DzPdnQ.qRzQA3LGUTEdPsLotEj9dMLGxJY")
+#client.run("NTQwMzM2ODcyNjczNTA5Mzc2.DzPdnQ.qRzQA3LGUTEdPsLotEj9dMLGxJY")
+client.run(TOKEN)
