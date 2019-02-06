@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands
 import youtube_dl
 import vlc
+from database_info import *
 
 class music:
     def __init__(self, bot):
@@ -13,7 +14,7 @@ class music:
         self.bot = bot
         
         # Connect to database and create operation cursor
-        self.con = psycopg2.connect(database='musicdatabase',user='gigacorn',password='bplieb123',host='localhost',port='5432')
+        self.con = psycopg2.connect(database=DATABASE,user=USER,password=PASSWORD,host=HOST,port=PORT)
         self.cur=self.con.cursor()
 
         # Set up audio task loop
