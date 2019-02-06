@@ -9,8 +9,7 @@ import asyncio
 
 # Database Imports
 import psycopg2
-from database_info import *
-from token_info import TOKEN
+from constant_info import *
 
 # Discord API
 import discord
