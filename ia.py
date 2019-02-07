@@ -16,8 +16,11 @@ import discord
 from discord.ext import commands
 
 # Media Player and Downloader
+import os.path
 import vlc
 import youtube_dl
+
+import random
 
 #***********************************************************************************#
 #                                   Main Class/Cog                                  #
@@ -40,6 +43,7 @@ class Music:
         self.queue = asyncio.Queue()
         self.queue_list = []
         self.next = False
+        self.stop = False
         self.playing = False
 
         # Save youtube-dl options
@@ -88,7 +92,7 @@ class Music:
         if not (param == "title" or param == "artist" or param == "genre"):
             param = "title"
             term = content
-        self.cur.execute("select title, artist, genre, link from music where {0} like '%{1}%';".format(param,term))
+        self.cur.execute("select title, artist, genre, key from music where {0} like '%{1}%';".format(param,term))
         return self.cur.fetchall()
 
 #***********************************************************************************#
@@ -134,23 +138,39 @@ class Music:
             await self.bot.send_message(ctx.message.channel, 'Database modified successfully!')
 
         except psycopg2.Error as e:
-            print('Caught insert error...')
+            await self.bot.send_message(ctx.message.channel,'Insert error...')
             con.rollback()
-            print(e)
+            #print(e)
 
 #***********************************************************************************#
 #                               Media Control Commands                              #
 #***********************************************************************************#
 
+    # Pauses audio loop
+    @commands.command(pass_context=True, no_pm=True)
+    async def pause(self, ctx):
+        if self.playing:
+            if not self.stop:
+                self.player.pause()
+                await self.bot.send_message(ctx.message.channel,"Media playback paused...")
+            else:
+                self.player.pause()
+                await self.bot.send_message(ctx.message.channel,"Media playback resumed...")
+
+        else:
+            await self.bot.send_message(ctx.message.channel,'Nothing is playing...')
+
+
+    # Enqueues from database
     @commands.command(pass_context=True, no_pm=True)
     async def play(self, ctx):
         try:
-            results = await self.searchdb(ctx.message.content[9:])
+            results = await self.searchdb(ctx.message.content[8:])
             if len(results) < 1:
                 await self.bot.send_message(ctx.message.channel,'No results...')
             elif len(results) == 1:
                 await self.bot.send_message(ctx.message.channel,'Enqueing: '+results[0][0]+" - "+results[0][1])
-                await self.queue.put("../Music/"+results[0][3]+".m4a")
+                await self.queue.put("Music/"+results[0][3]+".m4a")
             else:
                 await self.bot.send_message(ctx.message.channel,'Multiple results, pick a number or all...')
                 all_results = ''
@@ -162,14 +182,27 @@ class Music:
                 if choice == 'all':
                     await self.bot.send_message(ctx.message.channel,'Enqueing: all results')
                     for r in results:
-                        await self.queue.put("../Music/"+r[3]+".m4a")
+                        await self.queue.put("Music/"+r[3]+".m4a")
                 else:
                     await self.bot.send_message(ctx.message.channel,'Enqueing: '+results[int(choice)-1][0])
-                    await self.queue.put("../Music/"+results[int(choice)-1][3]+".m4a")
+                    await self.queue.put("Music/"+results[int(choice)-1][3]+".m4a")
 
         except psycopg2.Error as e:
-            await self.bot.send_message(ctx.message.channel,'Error...')
+            await self.bot.send_message(ctx.message.channel,'Retrieval error...')
             print(e)
+
+    @commands.command(pass_context=True, no_pm=True)
+    async def shuffle(self, ctx):
+        if not self.queue.empty():
+            temp = []
+            for i in range(self.queue.qsize()):
+                temp.append(await self.queue.get())
+            random.shuffle(temp)
+            for i in range(len(temp)):
+                await self.queue.put(temp.pop(0))
+            await self.bot.send_message(ctx.message.channel,'Shuffled!')
+        else:
+            await self.bot.send_message(ctx.message.channel,'Queue is empty...')
 
     @commands.command(pass_context=True, no_pm=True)
     async def skip(self, ctx):
