@@ -70,11 +70,10 @@ class Music:
                 title = self.queue_titles[0][0]
                 artist = self.queue_titles[0][1]
                 await self.bot.send_message(self.channel,'Now Playing: {0} - {1}'.format(title,artist))
-
+                self.queue_titles = self.queue_titles[1:]
                 while not self.next:
                     await asyncio.sleep(1)
                 self.player.stop()
-                self.queue_titles = self.queue_titles[1:]
                 self.playing = False
 
     def song_finished(self, event):
@@ -194,10 +193,11 @@ class Music:
     async def pause(self, ctx):
         if self.playing:
             if not self.paused:
+                self.paused = True
                 self.player.pause()
                 await self.bot.send_message(ctx.message.channel,"Media playback paused...")
             else:
-                self.paused = True
+                self.paused = False
                 self.player.pause()
                 await self.bot.send_message(ctx.message.channel,"Media playback resumed!")
         else:
@@ -255,8 +255,8 @@ class Music:
             await self.bot.send_message(ctx.message.channel, 'Queue is empty...')
         else:
             q_str = ''
-            for i in range(len(self.queue_titles)-1):
-                q_str += (str(i+1)+': {0} - {1}\n'.format(self.queue_titles[i+1][0],self.queue_titles[i+1][1]))
+            for i in range(len(self.queue_titles)):
+                q_str += (str(i+1)+': {0} - {1}\n'.format(self.queue_titles[i][0],self.queue_titles[i][1]))
             await self.bot.send_message(ctx.message.channel, 'Current Queue:\n'+q_str)
 
     
