@@ -17,10 +17,9 @@ from discord.ext import commands
 
 # Media Player and Downloader
 import os.path
+import random
 import vlc
 import youtube_dl
-
-import random
 
 #***********************************************************************************#
 #                                   Main Class/Cog                                  #
@@ -38,12 +37,13 @@ class Music:
 
         # Set up audio task loop
         self.bot.loop.create_task(self.audio_loop())
+        self.channel = None
         self.player = vlc.Instance().media_player_new()
         self.player.event_manager().event_attach(vlc.EventType.MediaPlayerEndReached,self.song_finished)
-        self.queue = asyncio.Queue()
-        self.queue_list = []
+        self.queue_paths = asyncio.Queue()
+        self.queue_titles = []
         self.next = False
-        self.stop = False
+        self.paused = False
         self.playing = False
 
         # Save youtube-dl options
@@ -56,16 +56,25 @@ class Music:
     async def audio_loop(self):
         while True:
             self.next = False
-            media_path = await self.queue.get()
+            media_path = await self.queue_paths.get()
             if not os.path.isfile(media_path):
-                print('Media does not exist')
+                print('Media does not exist... Redownloading')
+                print(media_path[6:-4])
+                await self.download(media_path[6:-4])
             else:
                 self.player.set_media(vlc.Instance().media_new_path(media_path))
                 self.player.play()
                 self.playing = True
+
+                # Now playing message
+                title = self.queue_titles[0][0]
+                artist = self.queue_titles[0][1]
+                await self.bot.send_message(self.channel,'Now Playing: {0} - {1}'.format(title,artist))
+
                 while not self.next:
                     await asyncio.sleep(1)
                 self.player.stop()
+                self.queue_titles = self.queue_titles[1:]
                 self.playing = False
 
     def song_finished(self, event):
@@ -78,22 +87,39 @@ class Music:
 
     async def download(self, key):
         try:
-            self.opts['outtmpl'] = ('../Music/'+key+'.m4a')
+            self.opts['outtmpl'] = ('Music/'+key+'.m4a')
             with youtube_dl.YoutubeDL(self.opts) as ydl:
                 ydl.download(['https://www.youtube.com/?v='+key])
         except(...):
             print('Download error caught...')
             print(e)
 
-    async def searchdb(self, content):
+    async def search_album(self, content):
+        return
+
+    async def search_artist(self, content):
+        return
+    
+    async def search_music(self, content):
         cut = content.find(' ')
         param = content[:cut]
         term = content[cut+1:]
-        if not (param == "title" or param == "artist" or param == "genre"):
-            param = "title"
+        if not (param == 'title' or param == 'artist' or param == 'genre'):
+            param = 'title'
             term = content
-        self.cur.execute("select title, artist, genre, key from music where {0} like '%{1}%';".format(param,term))
-        return self.cur.fetchall()
+        if param == 'genre':
+            self.cur.execute("select key, genre from genre where {0} like '{1}';".format(param,term))
+            results = self.cur.fetchall()
+            returns = []
+            for result in results:
+                term = result[0]
+                self.cur.execute("select title, artist, key from music where key like '{0}';".format(term))
+                returns += self.cur.fetchall()
+            print(returns)
+            return returns
+        else:
+            self.cur.execute("select title, artist, key from music where {0} like '%{1}%';".format(param,term))
+            return self.cur.fetchall()
 
 #***********************************************************************************#
 #                               Database Control Commands                           #
@@ -113,9 +139,19 @@ class Music:
         artist = artist_m.content
 
         # Get genre
-        await self.bot.send_message(ctx.message.channel, 'What is song\'s genre?')
+        await self.bot.send_message(ctx.message.channel, 'What is song\'s genre(s)?')
+        await self.bot.send_message(ctx.message.channel, 'If there is multiple please separate with a comma...')
         genre_m = await self.bot.wait_for_message(author=ctx.message.author)
-        genre = genre_m.content
+        genre_s = genre_m.content
+
+        # Proccess genres into list
+        genres = []
+        cut = genre_s.find(',')
+        while cut != -1:
+            genres.append(genre_s[:cut])
+            genre_s = genre_s[cut+2:]
+            cut = genre_s.find(',')
+        genres.append(genre_s)
 
         # Get link
         await self.bot.send_message(ctx.message.channel, 'What is the link to the song?')
@@ -132,8 +168,11 @@ class Music:
         # Attempt database modifications
         await self.bot.send_message(ctx.message.channel, 'Adding "{0}" to database'.format(title))
         try:
-            query = "INSERT INTO music(title, artist, genre, key) VALUES ('{0}', '{1}', '{2}', '{3}');"
-            self.cur.execute(query.format(title, artist, genre, key))
+            query = "insert into music(title, artist, key) values ('{0}', '{1}', '{2}');"
+            self.cur.execute(query.format(title, artist, key))
+            for genre in genres:
+                query = "insert into genre(key, genre) values ('{0}', '{1}');"
+                self.cur.execute(query.format(key, genre))
             self.con.commit()
             await self.bot.send_message(ctx.message.channel, 'Database modified successfully!')
 
@@ -141,6 +180,10 @@ class Music:
             await self.bot.send_message(ctx.message.channel,'Insert error...')
             con.rollback()
             #print(e)
+
+    @commands.command(pass_context=True, no_pm=True)
+    async def edit(self, ctx):
+        return
 
 #***********************************************************************************#
 #                               Media Control Commands                              #
@@ -150,13 +193,13 @@ class Music:
     @commands.command(pass_context=True, no_pm=True)
     async def pause(self, ctx):
         if self.playing:
-            if not self.stop:
+            if not self.paused:
                 self.player.pause()
                 await self.bot.send_message(ctx.message.channel,"Media playback paused...")
             else:
+                self.paused = True
                 self.player.pause()
-                await self.bot.send_message(ctx.message.channel,"Media playback resumed...")
-
+                await self.bot.send_message(ctx.message.channel,"Media playback resumed!")
         else:
             await self.bot.send_message(ctx.message.channel,'Nothing is playing...')
 
@@ -165,12 +208,20 @@ class Music:
     @commands.command(pass_context=True, no_pm=True)
     async def play(self, ctx):
         try:
-            results = await self.searchdb(ctx.message.content[8:])
+            self.channel = ctx.message.channel
+            results = await self.search_music(ctx.message.content[8:])
+
+            # No results
             if len(results) < 1:
                 await self.bot.send_message(ctx.message.channel,'No results...')
+
+            # Exactly one result
             elif len(results) == 1:
                 await self.bot.send_message(ctx.message.channel,'Enqueing: '+results[0][0]+" - "+results[0][1])
-                await self.queue.put("Music/"+results[0][3]+".m4a")
+                self.queue_titles.append([results[0][0].title(),results[0][1].title()])
+                await self.queue_paths.put("Music/"+results[0][2]+".m4a")
+
+            # Multiple results
             else:
                 await self.bot.send_message(ctx.message.channel,'Multiple results, pick a number or all...')
                 all_results = ''
@@ -179,31 +230,57 @@ class Music:
                 await self.bot.send_message(ctx.message.channel, all_results)
                 choice_m = await self.bot.wait_for_message(author=ctx.message.author)
                 choice = choice_m.content
+
+                # Play all results
                 if choice == 'all':
                     await self.bot.send_message(ctx.message.channel,'Enqueing: all results')
                     for r in results:
-                        await self.queue.put("Music/"+r[3]+".m4a")
+                        await self.queue_paths.put("Music/"+r[2]+".m4a")
+                        self.queue_titles.append([r[0].title(),r[1].title()])
+
+                # Play one result
                 else:
                     await self.bot.send_message(ctx.message.channel,'Enqueing: '+results[int(choice)-1][0])
-                    await self.queue.put("Music/"+results[int(choice)-1][3]+".m4a")
+                    await self.queue_paths.put("Music/"+results[int(choice)-1][2]+".m4a")
+                    self.queue_titles.append(results[int(choice)-1][0].title(),results[int(choice)-1][1].title())
 
         except psycopg2.Error as e:
             await self.bot.send_message(ctx.message.channel,'Retrieval error...')
             print(e)
 
+    # Prints names of songs in queue
+    @commands.command(pass_context=True, no_pm=True)
+    async def queue(self, ctx):
+        if self.queue_paths.empty(): 
+            await self.bot.send_message(ctx.message.channel, 'Queue is empty...')
+        else:
+            q_str = ''
+            for i in range(len(self.queue_titles)-1):
+                q_str += (str(i+1)+': {0} - {1}\n'.format(self.queue_titles[i+1][0],self.queue_titles[i+1][1]))
+            await self.bot.send_message(ctx.message.channel, 'Current Queue:\n'+q_str)
+
+    
     @commands.command(pass_context=True, no_pm=True)
     async def shuffle(self, ctx):
-        if not self.queue.empty():
+        if not self.queue_paths.empty():
+
+            # Store values in queue_paths
             temp = []
-            for i in range(self.queue.qsize()):
-                temp.append(await self.queue.get())
-            random.shuffle(temp)
+            for i in range(self.queue_paths.qsize()):
+                temp.append(await self.queue_paths.get())
+
+            # Shuffle queue_paths and queue_titles at once
+            c = list(zip(temp,self.queue_titles))
+            random.shuffle(c)
+            temp, self.queue_titles = list(zip(*c))
             for i in range(len(temp)):
-                await self.queue.put(temp.pop(0))
+                await self.queue_paths.put(temp[i])
             await self.bot.send_message(ctx.message.channel,'Shuffled!')
+
         else:
             await self.bot.send_message(ctx.message.channel,'Queue is empty...')
-
+    
+    # Ends the current song
     @commands.command(pass_context=True, no_pm=True)
     async def skip(self, ctx):
         if self.playing:
@@ -225,5 +302,4 @@ async def on_ready():
     print('User: '+str(client.user.name))
     print('ID: '+str(client.user.id))
 
-#client.run("NTQwMzM2ODcyNjczNTA5Mzc2.DzPdnQ.qRzQA3LGUTEdPsLotEj9dMLGxJY")
 client.run(TOKEN)
