@@ -188,6 +188,15 @@ class Music:
 #                               Media Control Commands                              #
 #***********************************************************************************#
 
+    @commands.command(pass_context=True, no_pm=True)
+    async def clear(self, ctx):
+        if self.queue_titles == []:
+            await self.bot.send_message(ctx.message.channel,"Queue is empty...")
+        else:
+            self.queue_titles = []
+            self.queue_paths = asyncio.Queue()
+            await self.bot.send_message(ctx.message.channel,"Queue cleared!")
+
     # Pauses audio loop
     @commands.command(pass_context=True, no_pm=True)
     async def pause(self, ctx):
@@ -298,8 +307,8 @@ client.add_cog(Music(client))
 
 @client.event
 async def on_ready():
-    print('Ready!')
     print('User: '+str(client.user.name))
     print('ID: '+str(client.user.id))
+    print('Ready!')
 
 client.run(TOKEN)
