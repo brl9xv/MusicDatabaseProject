@@ -84,21 +84,25 @@ class Music:
 #                                   Non-Commands                                    #
 #***********************************************************************************#
 
+    # Downloads key.m4a from Youtube to Music/
     async def download(self, key):
         try:
             self.opts['outtmpl'] = ('Music/'+key+'.m4a')
             with youtube_dl.YoutubeDL(self.opts) as ydl:
                 ydl.download(['https://www.youtube.com/?v='+key])
         except(...):
-            print('Download error caught...')
+            await self.bot.send_message(self.channel,'Download error...')
             print(e)
 
+    # Searches album table
     async def search_album(self, content):
         return
 
+    # Searches artist table
     async def search_artist(self, content):
         return
     
+    # Searches music table
     async def search_music(self, content):
         cut = content.find(' ')
         param = content[:cut]
@@ -119,6 +123,9 @@ class Music:
         else:
             self.cur.execute("select title, artist, key from music where {0} like '%{1}%';".format(param,term))
             return self.cur.fetchall()
+
+    async def string_split(string):
+        return
 
 #***********************************************************************************#
 #                               Database Control Commands                           #
@@ -164,7 +171,7 @@ class Music:
         await self.bot.send_message(ctx.message.channel, 'Downloading...')
         await self.download(key)
 
-        # Attempt database modifications
+        # Attempt database insertion
         await self.bot.send_message(ctx.message.channel, 'Adding "{0}" to database'.format(title))
         try:
             query = "insert into music(title, artist, key) values ('{0}', '{1}', '{2}');"
@@ -302,7 +309,7 @@ class Music:
 #                           Discord Client Initialization                           #
 #***********************************************************************************#
 
-client=commands.Bot(command_prefix=commands.when_mentioned_or("ia "))
+client=commands.Bot(command_prefix=commands.when_mentioned_or(['ia ','Ia','IA']))
 client.add_cog(Music(client))
 
 @client.event
