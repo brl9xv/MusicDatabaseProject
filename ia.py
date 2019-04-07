@@ -18,6 +18,7 @@ from discord.ext import commands
 # Media Player and Downloader
 import os.path
 import random
+from tinytag import TinyTag as tt
 import vlc
 import youtube_dl
 
@@ -124,8 +125,16 @@ class Music:
             self.cur.execute("select title, artist, key from music where {0} like '%{1}%';".format(param,term))
             return self.cur.fetchall()
 
-    async def string_split(string):
-        return
+    # Helper function to convert strings to lists (splits at spaces)
+    async def string_split(self, s):
+        result = []
+        cut = s.find(' ')
+        while cut != -1:
+            result.append(s[:cut])
+            s = s[cut+1:]
+            cut = s.find(' ')
+        result.append(s)
+        return result
 
 #***********************************************************************************#
 #                               Database Control Commands                           #
@@ -134,58 +143,122 @@ class Music:
     @commands.command(pass_context=True, no_pm=True)
     async def add(self, ctx):
 
-        # Get title
-        await self.bot.send_message(ctx.message.channel, 'What is the song called?')
-        title_m = await self.bot.wait_for_message(author=ctx.message.author)
-        title = title_m.content
+        request = await self.string_split(ctx.message.content)
 
-        # Get artist
-        await self.bot.send_message(ctx.message.channel, 'Who is the artist?')
-        artist_m = await self.bot.wait_for_message(author=ctx.message.author)
-        artist = artist_m.content
+        # Check for correct parameters
+        if len(request) == 2:
+            await self.bot.send_message(ctx.message.channel, 'Try "ia add [song | album | artist | label | playlist]"')
+            return
 
-        # Get genre
-        await self.bot.send_message(ctx.message.channel, 'What is song\'s genre(s)?')
-        await self.bot.send_message(ctx.message.channel, 'If there is multiple please separate with a comma...')
-        genre_m = await self.bot.wait_for_message(author=ctx.message.author)
-        genre_s = genre_m.content
+        # Add song
+        if request[2] == 'song':
+            # Get title
+            await self.bot.send_message(ctx.message.channel, 'What is the song called?')
+            title_m = await self.bot.wait_for_message(author=ctx.message.author)
+            title = (title_m.content).lower()
 
-        # Proccess genres into list
-        genres = []
-        cut = genre_s.find(',')
-        while cut != -1:
-            genres.append(genre_s[:cut])
-            genre_s = genre_s[cut+2:]
+            # Get artist
+            await self.bot.send_message(ctx.message.channel, 'Who is the artist?')
+            artist_m = await self.bot.wait_for_message(author=ctx.message.author)
+            artist = (artist_m.content).lower()
+            print(artist)
+
+            # Get album
+            yAlbum = ''
+            while yAlbum != 'y' and yAlbum != 'n':
+                await self.bot.send_message(ctx.message.channel, 'Is the song from an album? (y/n)')
+                yAlbum_m = await self.bot.wait_for_message(author=ctx.message.author)
+                yAlbum = (yAlbum_m.content).lower()
+                print(yAlbum)
+            if yAlbum == 'y':
+                await self.bot.send_message(ctx.message.channel, 'What is the name of the album?')
+                album_m = await self.bot.wait_for_message(author=ctx.message.author)
+                album = (album_m.content).lower()
+
+
+            # Get genre
+            await self.bot.send_message(ctx.message.channel, 'What is song\'s genre(s)?')
+            await self.bot.send_message(ctx.message.channel, 'If there is multiple please separate with a comma...')
+            genre_m = await self.bot.wait_for_message(author=ctx.message.author)
+            genre_s = (genre_m.content).lower()
+
+            # Proccess genres into list
+            genres = []
             cut = genre_s.find(',')
-        genres.append(genre_s)
+            while cut != -1:
+                genres.append(genre_s[:cut])
+                genre_s = genre_s[cut+2:]
+                cut = genre_s.find(',')
+            genres.append(genre_s)
 
-        # Get link
-        await self.bot.send_message(ctx.message.channel, 'What is the link to the song?')
-        link_m = await self.bot.wait_for_message(author=ctx.message.author)
+            # Get link
+            await self.bot.send_message(ctx.message.channel, 'What is the link to the song?')
+            link_m = await self.bot.wait_for_message(author=ctx.message.author)
 
-        # Cut link to get unique key
-        cut = link_m.content.find('=')+1
-        key = link_m.content[cut:]
+            # Cut link to get unique key
+            cut = link_m.content.find('=')+1
+            key = link_m.content[cut:]
 
-        # Attempt download
-        await self.bot.send_message(ctx.message.channel, 'Downloading...')
-        await self.download(key)
+            # Attempt download
+            await self.bot.send_message(ctx.message.channel, 'Downloading...')
+            await self.download(key)
 
-        # Attempt database insertion
-        await self.bot.send_message(ctx.message.channel, 'Adding "{0}" to database'.format(title))
-        try:
-            query = "insert into music(title, artist, key) values ('{0}', '{1}', '{2}');"
-            self.cur.execute(query.format(title, artist, key))
-            for genre in genres:
-                query = "insert into genre(key, genre) values ('{0}', '{1}');"
-                self.cur.execute(query.format(key, genre))
-            self.con.commit()
-            await self.bot.send_message(ctx.message.channel, 'Database modified successfully!')
+            # Get length
+            tag = tt.get('Music/{0}.m4a'.format(key))
+            length = tag.duration
+            print(length)
 
-        except psycopg2.Error as e:
-            await self.bot.send_message(ctx.message.channel,'Insert error...')
-            con.rollback()
-            #print(e)
+            # Attempt database insertion
+            await self.bot.send_message(ctx.message.channel, 'Adding "{0}" to database'.format(title))
+            try:
+
+                # Insert with album
+                if yAlbum == 'y':
+                    query = "insert into music(title, artist, album, key, length) values ('{0}', '{1}', '{2}', '{3}', '{4}');"
+                    self.cur.execute(query.format(title, artist, album, key, length))
+
+                # Insert without album
+                else:
+                    query = "insert into music(title, artist, key, length) values ('{0}', '{1}', '{2}', '{3}');"
+                    self.cur.execute(query.format(title, artist, key, length))
+
+                # Insert all genres
+                for genre in genres:
+                    query = "insert into genre(key, genre) values ('{0}', '{1}');"
+                    self.cur.execute(query.format(key, genre))
+
+                # Save successful changes
+                self.con.commit()
+                await self.bot.send_message(ctx.message.channel, 'Database modified successfully!')
+
+            # If insertion fails
+            except psycopg2.Error as e:
+                await self.bot.send_message(ctx.message.channel,'Insert error...')
+                self.con.rollback()
+                print(e)
+
+            return
+        
+        # Add artist
+        elif request[2] == 'artist':
+            return
+
+        # Add album
+        elif request[2] == 'album':
+            return
+
+        # Add label
+        elif request[2] == 'label':
+            return
+
+        # Add playlist
+        elif request[2] == 'playlist':
+            return
+
+        # Invalid parameter
+        else:
+            await self.bot.send_message(ctx.message.channel, 'Try "ia add [song | album | artist | label | playlist]"')
+            return
 
     @commands.command(pass_context=True, no_pm=True)
     async def edit(self, ctx):
@@ -309,7 +382,7 @@ class Music:
 #                           Discord Client Initialization                           #
 #***********************************************************************************#
 
-client=commands.Bot(command_prefix=commands.when_mentioned_or(['ia ','Ia','IA']))
+client=commands.Bot(command_prefix=commands.when_mentioned_or('ia '))
 client.add_cog(Music(client))
 
 @client.event
