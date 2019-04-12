@@ -1,9 +1,9 @@
 drop table if exists music cascade;
 drop table if exists playlist;
 drop table if exists genre;
-drop table if exists artist;
-drop table if exists album;
-drop table if exists label;
+drop table if exists artist cascade;
+drop table if exists album cascade;
+drop table if exists label cascade;
 
 create table artist (
 	name varchar(31) primary key,

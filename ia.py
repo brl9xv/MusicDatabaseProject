@@ -16,9 +16,9 @@ import discord
 from discord.ext import commands
 
 # Media Player and Downloader
+from audioread import audio_open as aread
 import os.path
 import random
-from tinytag import TinyTag as tt
 import vlc
 import youtube_dl
 
@@ -204,8 +204,8 @@ class Music:
             await self.download(key)
 
             # Get length
-            tag = tt.get('Music/{0}.m4a'.format(key))
-            length = tag.duration
+            tag = aread('Music/{0}.m4a'.format(key))
+            length = int(tag.duration)
             print(length)
 
             # Attempt database insertion
@@ -241,6 +241,32 @@ class Music:
         
         # Add artist
         elif request[2] == 'artist':
+            # Get name
+            await self.bot.send_message(ctx.message.channel, 'What is the artist\'s name?')
+            name_m = await self.bot.wait_for_message(author=ctx.message.author)
+            name = (name_m.content).lower()
+            
+            # Get founded
+            await self.bot.send_message(ctx.message.channel, 'What year was the band founded?')
+            founded_m = await self.bot.wait_for_message(author=ctx.message.author)
+            founded = (founded_m.content).lower()
+			
+	    # Attempt database insertion
+            await self.bot.send_message(ctx.message.channel, 'Adding "{0}" to database'.format(name))
+            try:
+                query = "insert into artist(name, founded) values ('{0}', '{1}');"
+                self.cur.execute(query.format(name, founded))
+
+                # Save successful changes
+                self.con.commit()
+                await self.bot.send_message(ctx.message.channel, 'Database modified successfully!')
+
+            # If insertion fails
+            except psycopg2.Error as e:
+                await self.bot.send_message(ctx.message.channel,'Insert error...')
+                self.con.rollback()
+                print(e)
+				
             return
 
         # Add album
