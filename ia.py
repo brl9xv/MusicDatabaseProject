@@ -277,10 +277,6 @@ class Music:
         elif request[2] == 'label':
             return
 
-        # Add playlist
-        elif request[2] == 'playlist':
-            return
-
         # Invalid parameter
         else:
             await self.bot.send_message(ctx.message.channel, 'Try "ia add [song | album | artist | label | playlist]"')
