@@ -147,7 +147,7 @@ class Music:
 
         # Check for correct parameters
         if len(request) == 2:
-            await self.bot.send_message(ctx.message.channel, 'Try "ia add [song | album | artist | label | playlist]"')
+            await self.bot.send_message(ctx.message.channel, 'Try "ia add [song | album | artist | label ]"')
             return
 
         # Add song
@@ -279,7 +279,7 @@ class Music:
 
         # Invalid parameter
         else:
-            await self.bot.send_message(ctx.message.channel, 'Try "ia add [song | album | artist | label | playlist]"')
+            await self.bot.send_message(ctx.message.channel, 'Try "ia add [song | album | artist | label ]"')
             return
 
     @commands.command(pass_context=True, no_pm=True)
