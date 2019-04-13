@@ -275,6 +275,37 @@ class Music:
 
         # Add label
         elif request[2] == 'label':
+            # Get name
+            await self.bot.send_message(ctx.message.channel, 'What is the label\'s name?')
+            name_m = await self.bot.wait_for_message(author=ctx.message.author)
+            name = (name_m.content).lower()
+
+            # Get founded
+            await self.bot.send_message(ctx.message.channel, 'What year was the label founded?')
+            founded_m = await self.bot.wait_for_message(author=ctx.message.author)
+            founded = (founded_m.content).lower()
+
+            # Get address
+            await self.bot.send_message(ctx.message.channel, 'What city is the label\'s headquarters located in?')
+            address_m = await self.bot.wait_for_message(author=ctx.message.author)
+            address = (address_m.content).lower()
+
+            # Attempt database insertion
+            await self.bot.send_message(ctx.message.channel, 'Adding "{0}" to database'.format(name))
+            try:
+                query = "insert into label(name, founded, address) values ('{0}', '{1}', '{2}');"
+                self.cur.execute(query.format(name, founded, address))
+
+                # Save successful changes
+                self.con.commit()
+                await self.bot.send_message(ctx.message.channel, 'Database modified successfully!')
+
+            # If insertion fails
+            except psycopg2.Error as e:
+                await self.bot.send_message(ctx.message.channel,'Insert error...')
+                self.con.rollback()
+                print(e)
+
             return
 
         # Invalid parameter
