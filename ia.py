@@ -17,6 +17,7 @@ from discord.ext import commands
 
 # Media Player and Downloader
 from audioread import audio_open as aread
+from google_images_download import google_images_download as gid
 import os.path
 import random
 import vlc
@@ -271,6 +272,118 @@ class Music:
 
         # Add album
         elif request[2] == 'album':
+            # Get name
+            await self.bot.send_message(ctx.message.channel, 'What is the album\'s name?')
+            name_m = await self.bot.wait_for_message(author=ctx.message.author)
+            name = (name_m.content).lower()
+
+            # Get artist
+            await self.bot.send_message(ctx.message.channel, 'What artist is the album by?')
+            artist_m = await self.bot.wait_for_message(author=ctx.message.author)
+            artist = (artist_m.content).lower()
+
+            # Get label
+            await self.bot.send_message(ctx.message.channel, 'What label was the album published under?')
+            label_m = await self.bot.wait_for_message(author=ctx.message.author)
+            label = (label_m.content).lower()
+
+            # Get release
+            await self.bot.send_message(ctx.message.channel, 'When was the album released?')
+            release_m = await self.bot.wait_for_message(author=ctx.message.author)
+            release = (release_m.content).lower()
+
+            # Get album art
+            await self.bot.send_message(ctx.message.channel, 'Finding album art...')
+            query = '{0} {1} album cover'.format(name, artist)
+            inst = gid.googleimagesdownload()
+            art_m = inst.download({'keywords':query,
+                                   'limit':1,
+                                   'output_directory':'Art/',
+                                   'no_directory':True})
+            art = art_m[query][0]
+
+            # Attempt database insertion
+            await self.bot.send_message(ctx.message.channel, 'Adding "{0}" to database'.format(name))
+            try:
+                query = "insert into album(name, artist, label, art, release) values ('{0}', '{1}', '{2}', '{3}', '{4}');"
+                self.cur.execute(query.format(name, artist, label, art, release))
+
+                # Save successful changes
+                self.con.commit()
+                await self.bot.send_message(ctx.message.channel, 'Database modified successfully!')
+
+            # If insertion fails
+            except psycopg2.Error as e:
+                await self.bot.send_message(ctx.message.channel,'Insert error...')
+                self.con.rollback()
+                print(e)
+                return
+
+            await self.bot.send_message(ctx.message.channel, 'How many songs would you like to add?')
+            numsongs_m = await self.bot.wait_for_message(author=ctx.message.author)
+            numsongs = int(numsongs_m.content)
+
+            for i in range(numsongs):
+                # Get title
+                await self.bot.send_message(ctx.message.channel, 'Song {0} of {1}:'.format(i+1,numsongs))
+                await self.bot.send_message(ctx.message.channel, 'What is the song called?')
+                title_m = await self.bot.wait_for_message(author=ctx.message.author)
+                title = (title_m.content).lower()
+
+                # Get genre
+                await self.bot.send_message(ctx.message.channel, 'What is song\'s genre(s)?')
+                await self.bot.send_message(ctx.message.channel, 'If there is multiple please separate with a comma...')
+                genre_m = await self.bot.wait_for_message(author=ctx.message.author)
+                genre_s = (genre_m.content).lower()
+
+                # Proccess genres into list
+                genres = []
+                cut = genre_s.find(',')
+                while cut != -1:
+                    genres.append(genre_s[:cut])
+                    genre_s = genre_s[cut+2:]
+                    cut = genre_s.find(',')
+                genres.append(genre_s)
+
+                # Get link
+                await self.bot.send_message(ctx.message.channel, 'What is the link to the song?')
+                link_m = await self.bot.wait_for_message(author=ctx.message.author)
+
+                # Cut link to get unique key
+                cut = link_m.content.find('=')+1
+                key = link_m.content[cut:]
+
+                # Attempt download
+                await self.bot.send_message(ctx.message.channel, 'Downloading...')
+                await self.download(key)
+
+                # Get length
+                tag = aread('Music/{0}.m4a'.format(key))
+                length = int(tag.duration)
+                print(length)
+
+                # Attempt database insertion
+                await self.bot.send_message(ctx.message.channel, 'Adding "{0}" to database'.format(title))
+                try:
+                    query = "insert into music(title, artist, album, key, length) values ('{0}', '{1}', '{2}', '{3}', '{4}');"
+                    self.cur.execute(query.format(title, artist, name, key, length))
+                    
+                    # Insert all genres
+                    for genre in genres:
+                        query = "insert into genre(key, genre) values ('{0}', '{1}');"
+                        self.cur.execute(query.format(key, genre))
+
+                    # Save successful changes
+                    self.con.commit()
+                    await self.bot.send_message(ctx.message.channel, 'Database modified successfully!')
+
+                # If insertion fails
+                except psycopg2.Error as e:
+                    await self.bot.send_message(ctx.message.channel,'Insert error...')
+                    self.con.rollback()
+                    i+=1
+                    print(e)
+
             return
 
         # Add label
