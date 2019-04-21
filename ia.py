@@ -27,7 +27,7 @@ import youtube_dl
 #                                   Main Class/Cog                                  #
 #***********************************************************************************#
 
-class Music:
+class Music(commands.Cog):
 
     def __init__(self, bot):
         # Save reference to passed bot instance
@@ -71,7 +71,7 @@ class Music:
                 # Now playing message
                 title = self.queue_titles[0][0]
                 artist = self.queue_titles[0][1]
-                await self.bot.send_message(self.channel,'Now Playing: {0} - {1}'.format(title,artist))
+                await self.channel.send('Now Playing: {0} - {1}'.format(title,artist))
                 self.queue_titles = self.queue_titles[1:]
                 while not self.next:
                     await asyncio.sleep(1)
@@ -93,7 +93,7 @@ class Music:
             with youtube_dl.YoutubeDL(self.opts) as ydl:
                 ydl.download(['https://www.youtube.com/?v='+key])
         except(...):
-            await self.bot.send_message(self.channel,'Download error...')
+            await self.channel.send('Download error...')
             print(e)
 
     # Searches album table
@@ -148,39 +148,39 @@ class Music:
 
         # Check for correct parameters
         if len(request) == 2:
-            await self.bot.send_message(ctx.message.channel, 'Try "ia add [song | album | artist | label ]"')
+            await ctx.message.channel.send('Try "ia add [song | album | artist | label ]"')
             return
 
         # Add song
         if request[2] == 'song':
             # Get title
-            await self.bot.send_message(ctx.message.channel, 'What is the song called?')
-            title_m = await self.bot.wait_for_message(author=ctx.message.author)
+            await ctx.message.channel.send('What is the song called?')
+            title_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
             title = (title_m.content).lower()
 
             # Get artist
-            await self.bot.send_message(ctx.message.channel, 'Who is the artist?')
-            artist_m = await self.bot.wait_for_message(author=ctx.message.author)
+            await ctx.message.channel.send('Who is the artist?')
+            artist_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
             artist = (artist_m.content).lower()
             print(artist)
 
             # Get album
             yAlbum = ''
             while yAlbum != 'y' and yAlbum != 'n':
-                await self.bot.send_message(ctx.message.channel, 'Is the song from an album? (y/n)')
-                yAlbum_m = await self.bot.wait_for_message(author=ctx.message.author)
+                await ctx.message.channel.send('Is the song from an album? (y/n)')
+                yAlbum_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
                 yAlbum = (yAlbum_m.content).lower()
                 print(yAlbum)
             if yAlbum == 'y':
-                await self.bot.send_message(ctx.message.channel, 'What is the name of the album?')
-                album_m = await self.bot.wait_for_message(author=ctx.message.author)
+                await ctx.message.channel.send('What is the name of the album?')
+                album_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
                 album = (album_m.content).lower()
 
 
             # Get genre
-            await self.bot.send_message(ctx.message.channel, 'What is song\'s genre(s)?')
-            await self.bot.send_message(ctx.message.channel, 'If there is multiple please separate with a comma...')
-            genre_m = await self.bot.wait_for_message(author=ctx.message.author)
+            await ctx.message.channel.send('What is song\'s genre(s)?')
+            await ctx.message.channel.send('If there is multiple please separate with a comma...')
+            genre_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
             genre_s = (genre_m.content).lower()
 
             # Proccess genres into list
@@ -193,15 +193,15 @@ class Music:
             genres.append(genre_s)
 
             # Get link
-            await self.bot.send_message(ctx.message.channel, 'What is the link to the song?')
-            link_m = await self.bot.wait_for_message(author=ctx.message.author)
+            await ctx.message.channel.send('What is the link to the song?')
+            link_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
 
             # Cut link to get unique key
             cut = link_m.content.find('=')+1
             key = link_m.content[cut:]
 
             # Attempt download
-            await self.bot.send_message(ctx.message.channel, 'Downloading...')
+            await ctx.message.channel.send('Downloading...')
             await self.download(key)
 
             # Get length
@@ -210,7 +210,7 @@ class Music:
             print(length)
 
             # Attempt database insertion
-            await self.bot.send_message(ctx.message.channel, 'Adding "{0}" to database'.format(title))
+            await ctx.message.channel.send('Adding "{0}" to database'.format(title))
             try:
 
                 # Insert with album
@@ -230,11 +230,11 @@ class Music:
 
                 # Save successful changes
                 self.con.commit()
-                await self.bot.send_message(ctx.message.channel, 'Database modified successfully!')
+                await ctx.message.channel.send('Database modified successfully!')
 
             # If insertion fails
             except psycopg2.Error as e:
-                await self.bot.send_message(ctx.message.channel,'Insert error...')
+                await ctx.message.channel.send('Insert error...')
                 self.con.rollback()
                 print(e)
 
@@ -243,28 +243,28 @@ class Music:
         # Add artist
         elif request[2] == 'artist':
             # Get name
-            await self.bot.send_message(ctx.message.channel, 'What is the artist\'s name?')
-            name_m = await self.bot.wait_for_message(author=ctx.message.author)
+            await ctx.message.channel.send('What is the artist\'s name?')
+            name_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
             name = (name_m.content).lower()
             
             # Get founded
-            await self.bot.send_message(ctx.message.channel, 'What year was the band founded?')
-            founded_m = await self.bot.wait_for_message(author=ctx.message.author)
+            await ctx.message.channel.send('What year was the band founded?')
+            founded_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
             founded = (founded_m.content).lower()
 			
 	    # Attempt database insertion
-            await self.bot.send_message(ctx.message.channel, 'Adding "{0}" to database'.format(name))
+            await ctx.message.channel.send('Adding "{0}" to database'.format(name))
             try:
                 query = "insert into artist(name, founded) values ('{0}', '{1}');"
                 self.cur.execute(query.format(name, founded))
 
                 # Save successful changes
                 self.con.commit()
-                await self.bot.send_message(ctx.message.channel, 'Database modified successfully!')
+                await ctx.message.channel.send('Database modified successfully!')
 
             # If insertion fails
             except psycopg2.Error as e:
-                await self.bot.send_message(ctx.message.channel,'Insert error...')
+                await ctx.message.channel.send('Insert error...')
                 self.con.rollback()
                 print(e)
 				
@@ -273,27 +273,27 @@ class Music:
         # Add album
         elif request[2] == 'album':
             # Get name
-            await self.bot.send_message(ctx.message.channel, 'What is the album\'s name?')
-            name_m = await self.bot.wait_for_message(author=ctx.message.author)
+            await ctx.message.channel.send('What is the album\'s name?')
+            name_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
             name = (name_m.content).lower()
 
             # Get artist
-            await self.bot.send_message(ctx.message.channel, 'What artist is the album by?')
-            artist_m = await self.bot.wait_for_message(author=ctx.message.author)
+            await ctx.message.channel.send('What artist is the album by?')
+            artist_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
             artist = (artist_m.content).lower()
 
             # Get label
-            await self.bot.send_message(ctx.message.channel, 'What label was the album published under?')
-            label_m = await self.bot.wait_for_message(author=ctx.message.author)
+            await ctx.message.channel.send('What label was the album published under?')
+            label_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
             label = (label_m.content).lower()
 
             # Get release
-            await self.bot.send_message(ctx.message.channel, 'When was the album released?')
-            release_m = await self.bot.wait_for_message(author=ctx.message.author)
+            await ctx.message.channel.send('When was the album released?')
+            release_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
             release = (release_m.content).lower()
 
             # Get album art
-            await self.bot.send_message(ctx.message.channel, 'Finding album art...')
+            await ctx.message.channel.send('Finding album art...')
             query = '{0} {1} album cover'.format(name, artist)
             inst = gid.googleimagesdownload()
             art_m = inst.download({'keywords':query,
@@ -303,37 +303,37 @@ class Music:
             art = art_m[query][0]
 
             # Attempt database insertion
-            await self.bot.send_message(ctx.message.channel, 'Adding "{0}" to database'.format(name))
+            await ctx.message.channel.send('Adding "{0}" to database'.format(name))
             try:
                 query = "insert into album(name, artist, label, art, release) values ('{0}', '{1}', '{2}', '{3}', '{4}');"
                 self.cur.execute(query.format(name, artist, label, art, release))
 
                 # Save successful changes
                 self.con.commit()
-                await self.bot.send_message(ctx.message.channel, 'Database modified successfully!')
+                await ctx.message.channel.send('Database modified successfully!')
 
             # If insertion fails
             except psycopg2.Error as e:
-                await self.bot.send_message(ctx.message.channel,'Insert error...')
+                await ctx.message.channel.send('Insert error...')
                 self.con.rollback()
                 print(e)
                 return
 
-            await self.bot.send_message(ctx.message.channel, 'How many songs would you like to add?')
-            numsongs_m = await self.bot.wait_for_message(author=ctx.message.author)
+            await ctx.message.channel.send('How many songs would you like to add?')
+            numsongs_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
             numsongs = int(numsongs_m.content)
 
             for i in range(numsongs):
                 # Get title
-                await self.bot.send_message(ctx.message.channel, 'Song {0} of {1}:'.format(i+1,numsongs))
-                await self.bot.send_message(ctx.message.channel, 'What is the song called?')
-                title_m = await self.bot.wait_for_message(author=ctx.message.author)
+                await ctx.message.channel.send('Song {0} of {1}:'.format(i+1,numsongs))
+                await ctx.message.channel.send('What is the song called?')
+                title_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
                 title = (title_m.content).lower()
 
                 # Get genre
-                await self.bot.send_message(ctx.message.channel, 'What is song\'s genre(s)?')
-                await self.bot.send_message(ctx.message.channel, 'If there is multiple please separate with a comma...')
-                genre_m = await self.bot.wait_for_message(author=ctx.message.author)
+                await ctx.message.channel.send('What is song\'s genre(s)?')
+                await ctx.message.channel.send('If there is multiple please separate with a comma...')
+                genre_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
                 genre_s = (genre_m.content).lower()
 
                 # Proccess genres into list
@@ -346,15 +346,15 @@ class Music:
                 genres.append(genre_s)
 
                 # Get link
-                await self.bot.send_message(ctx.message.channel, 'What is the link to the song?')
-                link_m = await self.bot.wait_for_message(author=ctx.message.author)
+                await ctx.message.channel.send('What is the link to the song?')
+                link_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
 
                 # Cut link to get unique key
                 cut = link_m.content.find('=')+1
                 key = link_m.content[cut:]
 
                 # Attempt download
-                await self.bot.send_message(ctx.message.channel, 'Downloading...')
+                await ctx.message.channel.send('Downloading...')
                 await self.download(key)
 
                 # Get length
@@ -363,7 +363,7 @@ class Music:
                 print(length)
 
                 # Attempt database insertion
-                await self.bot.send_message(ctx.message.channel, 'Adding "{0}" to database'.format(title))
+                await ctx.message.channel.send('Adding "{0}" to database'.format(title))
                 try:
                     query = "insert into music(title, artist, album, key, length) values ('{0}', '{1}', '{2}', '{3}', '{4}');"
                     self.cur.execute(query.format(title, artist, name, key, length))
@@ -375,11 +375,11 @@ class Music:
 
                     # Save successful changes
                     self.con.commit()
-                    await self.bot.send_message(ctx.message.channel, 'Database modified successfully!')
+                    await ctx.message.channel.send('Database modified successfully!')
 
                 # If insertion fails
                 except psycopg2.Error as e:
-                    await self.bot.send_message(ctx.message.channel,'Insert error...')
+                    await ctx.message.channel.send('Insert error...')
                     self.con.rollback()
                     i+=1
                     print(e)
@@ -389,33 +389,33 @@ class Music:
         # Add label
         elif request[2] == 'label':
             # Get name
-            await self.bot.send_message(ctx.message.channel, 'What is the label\'s name?')
-            name_m = await self.bot.wait_for_message(author=ctx.message.author)
+            await ctx.message.channel.send('What is the label\'s name?')
+            name_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
             name = (name_m.content).lower()
 
             # Get founded
-            await self.bot.send_message(ctx.message.channel, 'What year was the label founded?')
-            founded_m = await self.bot.wait_for_message(author=ctx.message.author)
+            await ctx.message.channel.send('What year was the label founded?')
+            founded_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
             founded = (founded_m.content).lower()
 
             # Get address
-            await self.bot.send_message(ctx.message.channel, 'What city is the label\'s headquarters located in?')
-            address_m = await self.bot.wait_for_message(author=ctx.message.author)
+            await ctx.message.channel.send('What city is the label\'s headquarters located in?')
+            address_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
             address = (address_m.content).lower()
 
             # Attempt database insertion
-            await self.bot.send_message(ctx.message.channel, 'Adding "{0}" to database'.format(name))
+            await ctx.message.channel.send('Adding "{0}" to database'.format(name))
             try:
                 query = "insert into label(name, founded, address) values ('{0}', '{1}', '{2}');"
                 self.cur.execute(query.format(name, founded, address))
 
                 # Save successful changes
                 self.con.commit()
-                await self.bot.send_message(ctx.message.channel, 'Database modified successfully!')
+                await ctx.message.channel.send('Database modified successfully!')
 
             # If insertion fails
             except psycopg2.Error as e:
-                await self.bot.send_message(ctx.message.channel,'Insert error...')
+                await ctx.message.channel.send('Insert error...')
                 self.con.rollback()
                 print(e)
 
@@ -423,7 +423,7 @@ class Music:
 
         # Invalid parameter
         else:
-            await self.bot.send_message(ctx.message.channel, 'Try "ia add [song | album | artist | label ]"')
+            await ctx.message.channel.send('Try "ia add [song | album | artist | label ]"')
             return
 
     @commands.command(pass_context=True, no_pm=True)
@@ -437,11 +437,11 @@ class Music:
     @commands.command(pass_context=True, no_pm=True)
     async def clear(self, ctx):
         if self.queue_titles == []:
-            await self.bot.send_message(ctx.message.channel,"Queue is empty...")
+            await ctx.message.channel.send("Queue is empty...")
         else:
             self.queue_titles = []
             self.queue_paths = asyncio.Queue()
-            await self.bot.send_message(ctx.message.channel,"Queue cleared!")
+            await ctx.message.channel.send("Queue cleared!")
 
     # Pauses audio loop
     @commands.command(pass_context=True, no_pm=True)
@@ -450,13 +450,13 @@ class Music:
             if not self.paused:
                 self.paused = True
                 self.player.pause()
-                await self.bot.send_message(ctx.message.channel,"Media playback paused...")
+                await ctx.message.channel.send("Media playback paused...")
             else:
                 self.paused = False
                 self.player.pause()
-                await self.bot.send_message(ctx.message.channel,"Media playback resumed!")
+                await ctx.message.channel.send("Media playback resumed!")
         else:
-            await self.bot.send_message(ctx.message.channel,'Nothing is playing...')
+            await ctx.message.channel.send('Nothing is playing...')
 
 
     # Enqueues from database
@@ -468,51 +468,51 @@ class Music:
 
             # No results
             if len(results) < 1:
-                await self.bot.send_message(ctx.message.channel,'No results...')
+                await ctx.message.channel.send('No results...')
 
             # Exactly one result
             elif len(results) == 1:
-                await self.bot.send_message(ctx.message.channel,'Enqueing: '+results[0][0]+" - "+results[0][1])
+                await ctx.message.channel.send('Enqueing: '+results[0][0]+" - "+results[0][1])
                 self.queue_titles.append([results[0][0].title(),results[0][1].title()])
                 await self.queue_paths.put("Music/"+results[0][2]+".m4a")
 
             # Multiple results
             else:
-                await self.bot.send_message(ctx.message.channel,'Multiple results, pick a number or all...')
+                await ctx.message.channel.send('Multiple results, pick a number or all...')
                 all_results = ''
                 for i in range(len(results)):
                     all_results += str(i+1)+': '+results[i][0]+' - '+results[i][1]+'\n'
-                await self.bot.send_message(ctx.message.channel, all_results)
-                choice_m = await self.bot.wait_for_message(author=ctx.message.author)
+                await ctx.message.channel.send( all_results)
+                choice_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
                 choice = choice_m.content
 
                 # Play all results
                 if choice == 'all':
-                    await self.bot.send_message(ctx.message.channel,'Enqueing: all results')
+                    await ctx.message.channel.send('Enqueing: all results')
                     for r in results:
                         await self.queue_paths.put("Music/"+r[2]+".m4a")
                         self.queue_titles.append([r[0].title(),r[1].title()])
 
                 # Play one result
                 else:
-                    await self.bot.send_message(ctx.message.channel,'Enqueing: '+results[int(choice)-1][0])
+                    await ctx.message.channel.send('Enqueing: '+results[int(choice)-1][0])
                     await self.queue_paths.put("Music/"+results[int(choice)-1][2]+".m4a")
                     self.queue_titles.append(results[int(choice)-1][0].title(),results[int(choice)-1][1].title())
 
         except psycopg2.Error as e:
-            await self.bot.send_message(ctx.message.channel,'Retrieval error...')
+            await ctx.message.channel.send('Retrieval error...')
             print(e)
 
     # Prints names of songs in queue
     @commands.command(pass_context=True, no_pm=True)
     async def queue(self, ctx):
         if self.queue_paths.empty(): 
-            await self.bot.send_message(ctx.message.channel, 'Queue is empty...')
+            await ctx.message.channel.send( 'Queue is empty...')
         else:
             q_str = ''
             for i in range(len(self.queue_titles)):
                 q_str += (str(i+1)+': {0} - {1}\n'.format(self.queue_titles[i][0],self.queue_titles[i][1]))
-            await self.bot.send_message(ctx.message.channel, 'Current Queue:\n'+q_str)
+            await ctx.message.channel.send( 'Current Queue:\n'+q_str)
 
     
     @commands.command(pass_context=True, no_pm=True)
@@ -530,19 +530,19 @@ class Music:
             temp, self.queue_titles = list(zip(*c))
             for i in range(len(temp)):
                 await self.queue_paths.put(temp[i])
-            await self.bot.send_message(ctx.message.channel,'Shuffled!')
+            await ctx.message.channel.send('Shuffled!')
 
         else:
-            await self.bot.send_message(ctx.message.channel,'Queue is empty...')
+            await ctx.message.channel.send('Queue is empty...')
     
     # Ends the current song
     @commands.command(pass_context=True, no_pm=True)
     async def skip(self, ctx):
         if self.playing:
-            await self.bot.send_message(ctx.message.channel,'Skipping...')
+            await ctx.message.channel.send('Skipping...')
             self.next = True
         else:
-            await self.bot.send_message(ctx.message.channel,'Nothing is playing...')
+            await ctx.message.channel.send('Nothing is playing...')
 
 #***********************************************************************************#
 #                           Discord Client Initialization                           #
