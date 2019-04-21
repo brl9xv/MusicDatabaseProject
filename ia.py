@@ -464,40 +464,119 @@ class Music(commands.Cog):
     async def play(self, ctx):
         try:
             self.channel = ctx.message.channel
-            results = await self.search_music(ctx.message.content[8:])
+            request = await self.string_split(ctx.message.content)
 
-            # No results
-            if len(results) < 1:
-                await ctx.message.channel.send('No results...')
+            # Handle incomplete usage
+            if len(request) < 4:
+                await ctx.message.channel.send('Try "ia play [song | album | artist | label | playlist | genre] ["name"]"')
+                return
 
-            # Exactly one result
-            elif len(results) == 1:
-                await ctx.message.channel.send('Enqueing: '+results[0][0]+" - "+results[0][1])
-                self.queue_titles.append([results[0][0].title(),results[0][1].title()])
-                await self.queue_paths.put("Music/"+results[0][2]+".m4a")
+            # Concatenate search term
+            for i in range(len(request)-4):
+                request[3] += (' '+request[4+i])
+            
+            # Search 
+            if request[2] in {'label','artist','album','playlist'}:
+                self.cur.execute("select distinct name from {0} where name = '{1}';".format(request[2],request[3]))
 
-            # Multiple results
+            elif request[2] == 'genre':
+                self.cur.execute("select distinct genre from genre where genre like '{0}';".format(request[3]))
+
+            elif request[2] == 'song':
+                self.cur.execute("select distinct title, artist, key from music where title like '{0}';".format(request[3]))
+
+            # Handle incorrect usage
             else:
-                await ctx.message.channel.send('Multiple results, pick a number or all...')
-                all_results = ''
-                for i in range(len(results)):
-                    all_results += str(i+1)+': '+results[i][0]+' - '+results[i][1]+'\n'
-                await ctx.message.channel.send( all_results)
-                choice_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-                choice = choice_m.content
+                await ctx.message.channel.send('Try "ia play [song | album | artist | label | playlist | genre] ["name"]"')
+                return
 
-                # Play all results
-                if choice == 'all':
-                    await ctx.message.channel.send('Enqueing: all results')
-                    for r in results:
-                        await self.queue_paths.put("Music/"+r[2]+".m4a")
-                        self.queue_titles.append([r[0].title(),r[1].title()])
+            # Store search results
+            results = self.cur.fetchall()
 
-                # Play one result
+            if request[2] == 'song':
+                # No results
+                if len(results) < 1:
+                    await ctx.message.channel.send('No results...')
+                    return
+
+                # Exactly one result
+                elif len(results) == 1:
+                    await ctx.message.channel.send('Enqueing: '+results[0][0]+" - "+results[0][1])
+                    self.queue_titles.append([results[0][0].title(),results[0][1].title()])
+                    await self.queue_paths.put("Music/"+results[0][2]+".m4a")
+
+                # Multiple results
                 else:
-                    await ctx.message.channel.send('Enqueing: '+results[int(choice)-1][0])
-                    await self.queue_paths.put("Music/"+results[int(choice)-1][2]+".m4a")
-                    self.queue_titles.append(results[int(choice)-1][0].title(),results[int(choice)-1][1].title())
+                    await ctx.message.channel.send('Multiple results, pick a number or all...')
+                    all_results = ''
+                    for i in range(len(results)):
+                        all_results += str(i+1)+': '+results[i][0]+' - '+results[i][1]+'\n'
+                    await ctx.message.channel.send( all_results)
+                    choice_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
+                    choice = choice_m.content
+
+                    # Play all results
+                    if choice == 'all':
+                        await ctx.message.channel.send('Enqueing: all results')
+                        for r in results:
+                            await self.queue_paths.put("Music/"+r[2]+".m4a")
+                            self.queue_titles.append([r[0].title(),r[1].title()])
+
+                    # Play one result
+                    else:
+                        await ctx.message.channel.send('Enqueing: '+results[int(choice)-1][0])
+                        await self.queue_paths.put("Music/"+results[int(choice)-1][2]+".m4a")
+                        self.queue_titles.append(results[int(choice)-1][0].title(),results[int(choice)-1][1].title())
+
+            else:
+                choice_num = "0"
+
+                # No results
+                if len(results) < 1:
+                    await ctx.message.channel.send('No results...')
+                    return
+
+                # Exactly one result
+                elif len(results) == 1:
+                    choice_num = "1"
+
+                # Multiple results
+                if choice_num == 0:
+                    await ctx.message.channel.send('Multiple results, pick a number...')
+                    all_results = ''
+                    for i in range(len(results)):
+                        all_results += str(i+1)+': '+results[i][0]+'\n'
+                    await ctx.message.channel.send(all_results)
+                    choice_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
+                    choice_num = choice_m.content
+                
+                # Find matching songs
+                choice = results[int(choice_num)-1][0] 
+                
+                if request[2] == 'artist':
+                    self.cur.execute("select m.title, m.artist, m.key from music as m, artist as a where m.artist = a.name and a.name = '{0}';".format(choice))
+                
+                elif request[2] == 'album':
+                    self.cur.execute("select m.title, m.artist, m.key from music as m, album as a where m.album = a.name and a.name = '{0}';".format(choice))
+
+                elif request[2] == 'playlist':
+                    self.cur.execute("select m.title, m.artist, m.key from music as m, playlist as p where m.key = p.key and p.name = '{0}';".format(choice))
+
+                elif request[2] == 'genre':
+                    self.cur.execute("select m.title, m.artist, m.key from music as m, genre as g where m.key = g.key and g.genre = '{0}';".format(choice))
+
+                else:
+                    self.cur.execute("select m.title, m.artist, m.key from music as m, label as l, album as a where l.name = a.label and a.name = m.album and l.name = '{0}';".format(choice))
+
+                results = self.cur.fetchall()
+
+                # Enqueue songs
+                await ctx.message.channel.send('Enqueing songs from {0}: {1}'.format(request[2], choice.title()))
+                for r in results:
+                    await self.queue_paths.put("Music/"+r[2]+".m4a")
+                    self.queue_titles.append([r[0].title(),r[1].title()])
+
+
 
         except psycopg2.Error as e:
             await ctx.message.channel.send('Retrieval error...')
