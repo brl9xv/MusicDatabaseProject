@@ -96,6 +96,12 @@ class Music(commands.Cog):
             await self.channel.send('Download error...')
             print(e)
 
+    # Requests for information
+    async def request_info(self, ctx, content):
+        await ctx.message.channel.send(content)
+        request_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
+        return (request_m.content).lower()
+
     # Searches album table
     async def search_album(self, content):
         return
@@ -154,34 +160,23 @@ class Music(commands.Cog):
         # Add song
         if request[2] == 'song':
             # Get title
-            await ctx.message.channel.send('What is the song called?')
-            title_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            title = (title_m.content).lower()
+            title = await self.request_info(ctx, 'What is the song called?')
 
             # Get artist
-            await ctx.message.channel.send('Who is the artist?')
-            artist_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            artist = (artist_m.content).lower()
+            artist = await self.request_info(ctx, 'Who is the artist?')
             print(artist)
 
             # Get album
             yAlbum = ''
             while yAlbum != 'y' and yAlbum != 'n':
-                await ctx.message.channel.send('Is the song from an album? (y/n)')
-                yAlbum_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-                yAlbum = (yAlbum_m.content).lower()
+                yAlbum = await self.request_info(ctx, 'Is the song from an album? (y/n)')
                 print(yAlbum)
             if yAlbum == 'y':
-                await ctx.message.channel.send('What is the name of the album?')
-                album_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-                album = (album_m.content).lower()
+                album = await self.request_info(ctx, 'What is the name of the album')
 
 
             # Get genre
-            await ctx.message.channel.send('What is song\'s genre(s)?')
-            await ctx.message.channel.send('If there is multiple please separate with a comma...')
-            genre_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            genre_s = (genre_m.content).lower()
+            genre_s = await self.request_info(ctx, 'What is the song\'s genre(s)? \n If there is multiple please seperate with a comma...')
 
             # Proccess genres into list
             genres = []
@@ -193,12 +188,11 @@ class Music(commands.Cog):
             genres.append(genre_s)
 
             # Get link
-            await ctx.message.channel.send('What is the link to the song?')
-            link_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
+            link = await self.request_info(ctx, 'What is the link to the song?')
 
             # Cut link to get unique key
-            cut = link_m.content.find('=')+1
-            key = link_m.content[cut:]
+            cut = link.find('=')+1
+            key = link[cut:]
 
             # Attempt download
             await ctx.message.channel.send('Downloading...')
