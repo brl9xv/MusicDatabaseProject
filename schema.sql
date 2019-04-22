@@ -25,7 +25,7 @@ create table album (
 );      
 
 create table music (
-	title varchar(31) not null,
+	title varchar(63) not null,
 	artist varchar(63) not null references artist(name),
 	album varchar(63) references album(name),
 	key varchar(11) primary key,
