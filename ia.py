@@ -102,36 +102,6 @@ class Music(commands.Cog):
         request_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
         return (request_m.content).lower()
 
-    # Searches album table
-    async def search_album(self, content):
-        return
-
-    # Searches artist table
-    async def search_artist(self, content):
-        return
-    
-    # Searches music table
-    async def search_music(self, content):
-        cut = content.find(' ')
-        param = content[:cut]
-        term = content[cut+1:]
-        if not (param == 'title' or param == 'artist' or param == 'genre'):
-            param = 'title'
-            term = content
-        if param == 'genre':
-            self.cur.execute("select key, genre from genre where {0} like '{1}';".format(param,term))
-            results = self.cur.fetchall()
-            returns = []
-            for result in results:
-                term = result[0]
-                self.cur.execute("select title, artist, key from music where key like '{0}';".format(term))
-                returns += self.cur.fetchall()
-            print(returns)
-            return returns
-        else:
-            self.cur.execute("select title, artist, key from music where {0} like '%{1}%';".format(param,term))
-            return self.cur.fetchall()
-
     # Helper function to convert strings to lists (splits at spaces)
     async def string_split(self, s):
         result = []
@@ -295,6 +265,7 @@ class Music(commands.Cog):
                                    'output_directory':'Art/',
                                    'no_directory':True})
             art = art_m[query][0]
+            await ctx.message.channel.send(file=discord.File(art))
 
             # Attempt database insertion
             await ctx.message.channel.send('Adding "{0}" to database'.format(name))
@@ -551,7 +522,7 @@ class Music(commands.Cog):
                     self.cur.execute("select m.title, m.artist, m.key from music as m, artist as a where m.artist = a.name and a.name = '{0}';".format(choice))
                 
                 elif request[2] == 'album':
-                    self.cur.execute("select m.title, m.artist, m.key from music as m, album as a where m.album = a.name and a.name = '{0}';".format(choice))
+                    self.cur.execute("select m.title, m.artist, m.key, a.art from music as m, album as a where m.album = a.name and a.name = '{0}';".format(choice))
 
                 elif request[2] == 'playlist':
                     self.cur.execute("select m.title, m.artist, m.key from music as m, playlist as p where m.key = p.key and p.name = '{0}';".format(choice))
@@ -565,6 +536,8 @@ class Music(commands.Cog):
                 results = self.cur.fetchall()
 
                 # Enqueue songs
+                if request[2] == 'album':
+                    await ctx.message.channel.send(file=discord.File(results[0][3]))
                 await ctx.message.channel.send('Enqueing songs from {0}: {1}'.format(request[2], choice.title()))
                 for r in results:
                     await self.queue_paths.put("Music/"+r[2]+".m4a")
