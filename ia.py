@@ -61,7 +61,6 @@ class Music(commands.Cog):
             media_path = await self.queue_paths.get()
             if not os.path.isfile(media_path):
                 print('Media does not exist... Redownloading')
-                print(media_path[6:-4])
                 await self.download(media_path[6:-4])
             else:
                 self.player.set_media(vlc.Instance().media_new_path(media_path))
@@ -72,10 +71,11 @@ class Music(commands.Cog):
                 title = self.queue_titles[0][0]
                 artist = self.queue_titles[0][1]
                 await self.channel.send('Now Playing: {0} - {1}'.format(title,artist))
-                self.queue_titles = self.queue_titles[1:]
+
                 while not self.next:
                     await asyncio.sleep(1)
                 self.player.stop()
+                self.queue_titles = self.queue_titles[1:]
                 self.playing = False
 
     def song_finished(self, event):
@@ -174,7 +174,7 @@ class Music(commands.Cog):
             print(length)
 
             # Attempt database insertion
-            await ctx.message.channel.send('Adding "{0}" to database'.format(title))
+            await ctx.message.channel.send('Adding song "{0}" to database'.format(title.title()))
             try:
 
                 # Insert with album
@@ -213,7 +213,7 @@ class Music(commands.Cog):
             founded = await self.request_info(ctx, 'What year was the band founded')
 			
 	    # Attempt database insertion
-            await ctx.message.channel.send('Adding "{0}" to database'.format(name))
+            await ctx.message.channel.send('Adding artist "{0}" to database'.format(name.title()))
             try:
                 query = "insert into artist(name, founded) values ('{0}', '{1}');"
                 self.cur.execute(query.format(name, founded))
@@ -242,7 +242,7 @@ class Music(commands.Cog):
             label = await self.request_info(ctx, 'What label was the album published under?')
 
             # Get release
-            release = await self.request_info(ctx, 'When was the album released?')
+            release = await self.request_info(ctx, 'In what year was the album released?')
 
             # Get album art
             await ctx.message.channel.send('Finding album art...')
@@ -256,7 +256,7 @@ class Music(commands.Cog):
             await ctx.message.channel.send(file=discord.File(art))
 
             # Attempt database insertion
-            await ctx.message.channel.send('Adding "{0}" to database'.format(name))
+            await ctx.message.channel.send('Adding album "{0}" to database'.format(name.title()))
             try:
                 query = "insert into album(name, artist, label, art, release) values ('{0}', '{1}', '{2}', '{3}', '{4}');"
                 self.cur.execute(query.format(name, artist, label, art, release))
@@ -271,10 +271,9 @@ class Music(commands.Cog):
                 self.con.rollback()
                 print(e)
                 return
-
-            #await ctx.message.channel.send('How many songs would you like to add?')
-            #numsongs_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            numsongs = await self.request_info(ctx, 'How many songs would you like to add')#int(numsongs_m.content)
+            
+            # Get number of songs to add to album
+            numsongs = await self.request_info(ctx, 'How many songs would you like to add to album {0}?'.format(name.title()))
 
             for i in range(numsongs):
                 # Get title
@@ -316,7 +315,7 @@ class Music(commands.Cog):
                 print(length)
 
                 # Attempt database insertion
-                await ctx.message.channel.send('Adding "{0}" to database'.format(title))
+                await ctx.message.channel.send('Adding song "{0}" to database'.format(title.title()))
                 try:
                     query = "insert into music(title, artist, album, key, length) values ('{0}', '{1}', '{2}', '{3}', '{4}');"
                     self.cur.execute(query.format(title, artist, name, key, length))
@@ -342,22 +341,16 @@ class Music(commands.Cog):
         # Add label
         elif request[2] == 'label':
             # Get name
-            await ctx.message.channel.send('What is the label\'s name?')
-            name_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            name = (name_m.content).lower()
+            name = await self.request_info(ctx, 'What is the label\'s name?')
 
             # Get founded
-            await ctx.message.channel.send('What year was the label founded?')
-            founded_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            founded = (founded_m.content).lower()
+            founded = await self.request_info(ctx, 'What year was the label founded?')
 
             # Get address
-            await ctx.message.channel.send('What city is the label\'s headquarters located in?')
-            address_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            address = (address_m.content).lower()
+            address = await self.request_info(ctx, 'What city is the label\'s headquarters located in?')
 
             # Attempt database insertion
-            await ctx.message.channel.send('Adding "{0}" to database'.format(name))
+            await ctx.message.channel.send('Adding label "{0}" to database'.format(name.title()))
             try:
                 query = "insert into label(name, founded, address) values ('{0}', '{1}', '{2}');"
                 self.cur.execute(query.format(name, founded, address))
@@ -559,9 +552,9 @@ class Music(commands.Cog):
                 temp.append(await self.queue_paths.get())
 
             # Shuffle queue_paths and queue_titles at once
-            c = list(zip(temp,self.queue_titles))
+            c = list(zip(temp,self.queue_titles[1:]))
             random.shuffle(c)
-            temp, self.queue_titles = list(zip(*c))
+            temp, self.queue_titles[1:] = list(zip(*c))
             for i in range(len(temp)):
                 await self.queue_paths.put(temp[i])
             await ctx.message.channel.send('Shuffled!')
