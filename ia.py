@@ -207,14 +207,10 @@ class Music(commands.Cog):
         # Add artist
         elif request[2] == 'artist':
             # Get name
-            await ctx.message.channel.send('What is the artist\'s name?')
-            name_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            name = (name_m.content).lower()
+            name = await self.request_info(ctx, 'What is the artist\'s name?')
             
             # Get founded
-            await ctx.message.channel.send('What year was the band founded?')
-            founded_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            founded = (founded_m.content).lower()
+            founded = await self.request_info(ctx, 'What year was the band founded')
 			
 	    # Attempt database insertion
             await ctx.message.channel.send('Adding "{0}" to database'.format(name))
@@ -237,24 +233,16 @@ class Music(commands.Cog):
         # Add album
         elif request[2] == 'album':
             # Get name
-            await ctx.message.channel.send('What is the album\'s name?')
-            name_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            name = (name_m.content).lower()
+            name = await self.request_info(ctx, 'What is the album\'s name?')
 
             # Get artist
-            await ctx.message.channel.send('What artist is the album by?')
-            artist_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            artist = (artist_m.content).lower()
+            artist = await self.request_info(ctx, 'What artist is the album by?')
 
             # Get label
-            await ctx.message.channel.send('What label was the album published under?')
-            label_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            label = (label_m.content).lower()
+            label = await self.request_info(ctx, 'What label was the album published under?')
 
             # Get release
-            await ctx.message.channel.send('When was the album released?')
-            release_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            release = (release_m.content).lower()
+            release = await self.request_info(ctx, 'When was the album released?')
 
             # Get album art
             await ctx.message.channel.send('Finding album art...')
@@ -284,22 +272,22 @@ class Music(commands.Cog):
                 print(e)
                 return
 
-            await ctx.message.channel.send('How many songs would you like to add?')
-            numsongs_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            numsongs = int(numsongs_m.content)
+            #await ctx.message.channel.send('How many songs would you like to add?')
+            #numsongs_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
+            numsongs = await self.request_info(ctx, 'How many songs would you like to add')#int(numsongs_m.content)
 
             for i in range(numsongs):
                 # Get title
                 await ctx.message.channel.send('Song {0} of {1}:'.format(i+1,numsongs))
-                await ctx.message.channel.send('What is the song called?')
-                title_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-                title = (title_m.content).lower()
+                #await ctx.message.channel.send('What is the song called?')
+                #title_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
+                title = await self.request_info(ctx, 'What is the song called?')#(title_m.content).lower()
 
                 # Get genre
-                await ctx.message.channel.send('What is song\'s genre(s)?')
-                await ctx.message.channel.send('If there is multiple please separate with a comma...')
-                genre_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-                genre_s = (genre_m.content).lower()
+                #await ctx.message.channel.send('What is song\'s genre(s)?')
+                #await ctx.message.channel.send('If there is multiple please separate with a comma...')
+                #genre_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
+                genre_s = await self.request_info(ctx, 'What is song\'s genre(s)? \n If there is multiple please seperate with a comma')
 
                 # Proccess genres into list
                 genres = []
