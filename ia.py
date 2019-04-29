@@ -373,6 +373,42 @@ class Music(commands.Cog):
             return
 
     @commands.command(pass_context=True, no_pm=True)
+    async def delete(self, ctx):
+        try:
+            request = await self.string_split(ctx.message.content)
+            
+            # Handle incomplete usage
+            if len(request) < 4:
+                await ctx.message.channel.send('Try "ia delete [song | album | artist | label | playlist] ["name"]"')
+                return
+
+            # Concatenate search term
+            for i in range(len(request)-4):
+                request[3] += (' '+request[4+i])
+
+            # Search and delete
+            if request[2] in {'label','artist','album','playlist'}:
+                self.cur.execute("delete from {0} where name = '{1}';".format(request[2],request[3]))
+
+            elif request[2] == 'song':
+                self.cur.execute("delete from genre as g using music as m where g.key = m.key and m.title = '{0}';".format(request[3]))
+                self.cur.execute("delete from music where title = '{0}';".format(request[3]))
+
+            # Handle incorrect usage
+            else:
+                await ctx.message.channel.send('Try "ia delete [song | album | artist | label | playlist ] ["name"]"')
+                return
+
+            await ctx.message.channel.send("Deletion successful!")
+            
+        # If deletion fails
+        except psycopg2.Error as e:
+            await ctx.message.channel.send('Deletion error...')
+            await ctx.message.channel.send('Please ensure the {0} exists and is not being used in other items'.format(request[2]))
+            self.con.rollback()
+            print(e)
+
+    @commands.command(pass_context=True, no_pm=True)
     async def edit(self, ctx):
         return
 
@@ -385,7 +421,7 @@ class Music(commands.Cog):
         if self.queue_titles == []:
             await ctx.message.channel.send("Queue is empty...")
         else:
-            self.queue_titles = []
+            self.queue_titles = [self.queue_titles[0]]
             self.queue_paths = asyncio.Queue()
             await ctx.message.channel.send("Queue cleared!")
 
@@ -537,9 +573,10 @@ class Music(commands.Cog):
             await ctx.message.channel.send( 'Queue is empty...')
         else:
             q_str = ''
-            for i in range(len(self.queue_titles)):
-                q_str += (str(i+1)+': {0} - {1}\n'.format(self.queue_titles[i][0],self.queue_titles[i][1]))
-            await ctx.message.channel.send( 'Current Queue:\n'+q_str)
+            q_str += (':arrow_forward: {0} - {1} :arrow_forward:\n'.format(self.queue_titles[0][0],self.queue_titles[0][1]))
+            for i in range(len(self.queue_titles)-1):
+                q_str += (str(i+1)+': {0} - {1}\n'.format(self.queue_titles[i+1][0],self.queue_titles[i+1][1]))
+            await ctx.message.channel.send(q_str)
 
     
     @commands.command(pass_context=True, no_pm=True)
