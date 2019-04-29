@@ -303,7 +303,7 @@ class Music(commands.Cog):
 
             #await ctx.message.channel.send('How many songs would you like to add?')
             #numsongs_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            numsongs = await self.request_info(ctx, 'How many songs would you like to add')#int(numsongs_m.content)
+            numsongs = await self.request_info(ctx, 'How many songs would you like to add')
 
             for i in range(numsongs):
                 # Get title
@@ -328,12 +328,12 @@ class Music(commands.Cog):
                 genres.append(genre_s)
 
                 # Get link
-                await ctx.message.channel.send('What is the link to the song?')
-                link_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
+                #await ctx.message.channel.send('What is the link to the song?')
+                link = await self.request_info(ctx, 'What is the link to the song?')#self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
 
                 # Cut link to get unique key
-                cut = link_m.content.find('=')+1
-                key = link_m.content[cut:]
+                cut = link.content.find('=')+1
+                key = link.content[cut:]
 
                 # Attempt download
                 await ctx.message.channel.send('Downloading...')
@@ -410,6 +410,25 @@ class Music(commands.Cog):
 
     @commands.command(pass_context=True, no_pm=True)
     async def edit(self, ctx):
+
+        request = await self.string_split(ctx.message.content)
+        
+        edit_b = await self.request_info(ctx, 'What would you like to edit? (Add constraints, Remove constraints, Change default values, Change column data types, Rename columns')
+        
+        if edit_b == 'add constraints':
+            
+            edit_a = await self.request_info(ctx, 'Which constraint are you adding?')
+            edit_c = await self.request_info(ctx, 'Which column are you adding the constraint to?')
+
+            try:
+                query = "alter table {0} {1} {2} ({3})"
+                self.cur.execute(query.format(request[2], edit_b, edit_a, edit,c)
+
+            except psycopg2.Error as e:
+                await ctx.message.channel.send('Insert error...')
+                self.con.rollback()
+                print(e)
+
         return
 
 #***********************************************************************************#
