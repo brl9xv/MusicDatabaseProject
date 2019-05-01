@@ -61,7 +61,6 @@ class Music(commands.Cog):
             media_path = await self.queue_paths.get()
             if not os.path.isfile(media_path):
                 print('Media does not exist... Redownloading')
-                print(media_path[6:-4])
                 await self.download(media_path[6:-4])
             else:
                 self.player.set_media(vlc.Instance().media_new_path(media_path))
@@ -72,10 +71,11 @@ class Music(commands.Cog):
                 title = self.queue_titles[0][0]
                 artist = self.queue_titles[0][1]
                 await self.channel.send('Now Playing: {0} - {1}'.format(title,artist))
-                self.queue_titles = self.queue_titles[1:]
+
                 while not self.next:
                     await asyncio.sleep(1)
                 self.player.stop()
+                self.queue_titles = self.queue_titles[1:]
                 self.playing = False
 
     def song_finished(self, event):
@@ -101,36 +101,6 @@ class Music(commands.Cog):
         await ctx.message.channel.send(content)
         request_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
         return (request_m.content).lower()
-
-    # Searches album table
-    async def search_album(self, content):
-        return
-
-    # Searches artist table
-    async def search_artist(self, content):
-        return
-    
-    # Searches music table
-    async def search_music(self, content):
-        cut = content.find(' ')
-        param = content[:cut]
-        term = content[cut+1:]
-        if not (param == 'title' or param == 'artist' or param == 'genre'):
-            param = 'title'
-            term = content
-        if param == 'genre':
-            self.cur.execute("select key, genre from genre where {0} like '{1}';".format(param,term))
-            results = self.cur.fetchall()
-            returns = []
-            for result in results:
-                term = result[0]
-                self.cur.execute("select title, artist, key from music where key like '{0}';".format(term))
-                returns += self.cur.fetchall()
-            print(returns)
-            return returns
-        else:
-            self.cur.execute("select title, artist, key from music where {0} like '%{1}%';".format(param,term))
-            return self.cur.fetchall()
 
     # Helper function to convert strings to lists (splits at spaces)
     async def string_split(self, s):
@@ -204,7 +174,7 @@ class Music(commands.Cog):
             print(length)
 
             # Attempt database insertion
-            await ctx.message.channel.send('Adding "{0}" to database'.format(title))
+            await ctx.message.channel.send('Adding song "{0}" to database'.format(title.title()))
             try:
 
                 # Insert with album
@@ -243,7 +213,7 @@ class Music(commands.Cog):
             founded = await self.request_info(ctx, 'What year was the band founded')
 			
 	    # Attempt database insertion
-            await ctx.message.channel.send('Adding "{0}" to database'.format(name))
+            await ctx.message.channel.send('Adding artist "{0}" to database'.format(name.title()))
             try:
                 query = "insert into artist(name, founded) values ('{0}', '{1}');"
                 self.cur.execute(query.format(name, founded))
@@ -272,7 +242,7 @@ class Music(commands.Cog):
             label = await self.request_info(ctx, 'What label was the album published under?')
 
             # Get release
-            release = await self.request_info(ctx, 'When was the album released?')
+            release = await self.request_info(ctx, 'In what year was the album released?')
 
             # Get album art
             await ctx.message.channel.send('Finding album art...')
@@ -283,9 +253,10 @@ class Music(commands.Cog):
                                    'output_directory':'Art/',
                                    'no_directory':True})
             art = art_m[query][0]
+            await ctx.message.channel.send(file=discord.File(art))
 
             # Attempt database insertion
-            await ctx.message.channel.send('Adding "{0}" to database'.format(name))
+            await ctx.message.channel.send('Adding album "{0}" to database'.format(name.title()))
             try:
                 query = "insert into album(name, artist, label, art, release) values ('{0}', '{1}', '{2}', '{3}', '{4}');"
                 self.cur.execute(query.format(name, artist, label, art, release))
@@ -300,10 +271,9 @@ class Music(commands.Cog):
                 self.con.rollback()
                 print(e)
                 return
-
-            #await ctx.message.channel.send('How many songs would you like to add?')
-            #numsongs_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            numsongs = await self.request_info(ctx, 'How many songs would you like to add')
+            
+            # Get number of songs to add to album
+            numsongs = await self.request_info(ctx, 'How many songs would you like to add to album {0}?'.format(name.title()))
 
             for i in range(numsongs):
                 # Get title
@@ -345,7 +315,7 @@ class Music(commands.Cog):
                 print(length)
 
                 # Attempt database insertion
-                await ctx.message.channel.send('Adding "{0}" to database'.format(title))
+                await ctx.message.channel.send('Adding song "{0}" to database'.format(title.title()))
                 try:
                     query = "insert into music(title, artist, album, key, length) values ('{0}', '{1}', '{2}', '{3}', '{4}');"
                     self.cur.execute(query.format(title, artist, name, key, length))
@@ -371,22 +341,16 @@ class Music(commands.Cog):
         # Add label
         elif request[2] == 'label':
             # Get name
-            await ctx.message.channel.send('What is the label\'s name?')
-            name_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            name = (name_m.content).lower()
+            name = await self.request_info(ctx, 'What is the label\'s name?')
 
             # Get founded
-            await ctx.message.channel.send('What year was the label founded?')
-            founded_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            founded = (founded_m.content).lower()
+            founded = await self.request_info(ctx, 'What year was the label founded?')
 
             # Get address
-            await ctx.message.channel.send('What city is the label\'s headquarters located in?')
-            address_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-            address = (address_m.content).lower()
+            address = await self.request_info(ctx, 'What city is the label\'s headquarters located in?')
 
             # Attempt database insertion
-            await ctx.message.channel.send('Adding "{0}" to database'.format(name))
+            await ctx.message.channel.send('Adding label "{0}" to database'.format(name.title()))
             try:
                 query = "insert into label(name, founded, address) values ('{0}', '{1}', '{2}');"
                 self.cur.execute(query.format(name, founded, address))
@@ -407,6 +371,42 @@ class Music(commands.Cog):
         else:
             await ctx.message.channel.send('Try "ia add [song | album | artist | label ]"')
             return
+
+    @commands.command(pass_context=True, no_pm=True)
+    async def delete(self, ctx):
+        try:
+            request = await self.string_split(ctx.message.content)
+            
+            # Handle incomplete usage
+            if len(request) < 4:
+                await ctx.message.channel.send('Try "ia delete [song | album | artist | label | playlist] ["name"]"')
+                return
+
+            # Concatenate search term
+            for i in range(len(request)-4):
+                request[3] += (' '+request[4+i])
+
+            # Search and delete
+            if request[2] in {'label','artist','album','playlist'}:
+                self.cur.execute("delete from {0} where name = '{1}';".format(request[2],request[3]))
+
+            elif request[2] == 'song':
+                self.cur.execute("delete from genre as g using music as m where g.key = m.key and m.title = '{0}';".format(request[3]))
+                self.cur.execute("delete from music where title = '{0}';".format(request[3]))
+
+            # Handle incorrect usage
+            else:
+                await ctx.message.channel.send('Try "ia delete [song | album | artist | label | playlist ] ["name"]"')
+                return
+
+            await ctx.message.channel.send("Deletion successful!")
+            
+        # If deletion fails
+        except psycopg2.Error as e:
+            await ctx.message.channel.send('Deletion error...')
+            await ctx.message.channel.send('Please ensure the {0} exists and is not being used in other items'.format(request[2]))
+            self.con.rollback()
+            print(e)
 
     @commands.command(pass_context=True, no_pm=True)
     async def edit(self, ctx):
@@ -440,7 +440,7 @@ class Music(commands.Cog):
         if self.queue_titles == []:
             await ctx.message.channel.send("Queue is empty...")
         else:
-            self.queue_titles = []
+            self.queue_titles = [self.queue_titles[0]]
             self.queue_paths = asyncio.Queue()
             await ctx.message.channel.send("Queue cleared!")
 
@@ -558,7 +558,7 @@ class Music(commands.Cog):
                     self.cur.execute("select m.title, m.artist, m.key from music as m, artist as a where m.artist = a.name and a.name = '{0}';".format(choice))
                 
                 elif request[2] == 'album':
-                    self.cur.execute("select m.title, m.artist, m.key from music as m, album as a where m.album = a.name and a.name = '{0}';".format(choice))
+                    self.cur.execute("select m.title, m.artist, m.key, a.art from music as m, album as a where m.album = a.name and a.name = '{0}';".format(choice))
 
                 elif request[2] == 'playlist':
                     self.cur.execute("select m.title, m.artist, m.key from music as m, playlist as p where m.key = p.key and p.name = '{0}';".format(choice))
@@ -572,6 +572,8 @@ class Music(commands.Cog):
                 results = self.cur.fetchall()
 
                 # Enqueue songs
+                if request[2] == 'album':
+                    await ctx.message.channel.send(file=discord.File(results[0][3]))
                 await ctx.message.channel.send('Enqueing songs from {0}: {1}'.format(request[2], choice.title()))
                 for r in results:
                     await self.queue_paths.put("Music/"+r[2]+".m4a")
@@ -590,9 +592,10 @@ class Music(commands.Cog):
             await ctx.message.channel.send( 'Queue is empty...')
         else:
             q_str = ''
-            for i in range(len(self.queue_titles)):
-                q_str += (str(i+1)+': {0} - {1}\n'.format(self.queue_titles[i][0],self.queue_titles[i][1]))
-            await ctx.message.channel.send( 'Current Queue:\n'+q_str)
+            q_str += (':arrow_forward: {0} - {1} :arrow_forward:\n'.format(self.queue_titles[0][0],self.queue_titles[0][1]))
+            for i in range(len(self.queue_titles)-1):
+                q_str += (str(i+1)+': {0} - {1}\n'.format(self.queue_titles[i+1][0],self.queue_titles[i+1][1]))
+            await ctx.message.channel.send(q_str)
 
     
     @commands.command(pass_context=True, no_pm=True)
@@ -605,9 +608,9 @@ class Music(commands.Cog):
                 temp.append(await self.queue_paths.get())
 
             # Shuffle queue_paths and queue_titles at once
-            c = list(zip(temp,self.queue_titles))
+            c = list(zip(temp,self.queue_titles[1:]))
             random.shuffle(c)
-            temp, self.queue_titles = list(zip(*c))
+            temp, self.queue_titles[1:] = list(zip(*c))
             for i in range(len(temp)):
                 await self.queue_paths.put(temp[i])
             await ctx.message.channel.send('Shuffled!')
