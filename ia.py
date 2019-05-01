@@ -413,21 +413,18 @@ class Music(commands.Cog):
 
         request = await self.string_split(ctx.message.content)
         
-        edit_b = await self.request_info(ctx, 'What would you like to edit? (Add constraints, Remove constraints, Change default values, Change column data types, Rename columns')
-        
-        if edit_b == 'add constraints':
-            
-            edit_a = await self.request_info(ctx, 'Which constraint are you adding?')
-            edit_c = await self.request_info(ctx, 'Which column are you adding the constraint to?')
+        edit_a = await self.request_info(ctx, 'Which column would you like to apply the changes to?')
+        edit_b = await self.request_info(ctx, 'Which value would you like to change?')
+        edit_c = await self.request_info(ctx, 'What would you like to change it to?')
 
-            try:
-                query = "alter table {0} {1} {2} ({3})"
-                self.cur.execute(query.format(request[2], edit_b, edit_a, edit,c)
+        try:
+            query = "update {0} set {1} = {2} where {1} = {3}"
+            self.cur.execute(query.format(request[2], edit_a, edit_c, edit,b)
 
-            except psycopg2.Error as e:
-                await ctx.message.channel.send('Insert error...')
-                self.con.rollback()
-                print(e)
+        except psycopg2.Error as e:
+            await ctx.message.channel.send('Insert error...')
+            self.con.rollback()
+            print(e)
 
         return
 
