@@ -88,6 +88,8 @@ class Music(commands.Cog):
 
     # Downloads key.m4a from Youtube to Music/
     async def download(self, key):
+        print(key)
+        print('https://www.youtube.com/?v='+key)
         try:
             self.opts['outtmpl'] = ('Music/'+key+'.m4a')
             with youtube_dl.YoutubeDL(self.opts) as ydl:
@@ -100,6 +102,9 @@ class Music(commands.Cog):
     async def request_info(self, ctx, content):
         await ctx.message.channel.send(content)
         request_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
+        print(request_m.content[:5])
+        if request_m.content[:5] == 'https':
+            return (request_m.content)
         return (request_m.content).lower()
 
     # Helper function to convert strings to lists (splits at spaces)
@@ -275,7 +280,7 @@ class Music(commands.Cog):
             # Get number of songs to add to album
             numsongs = await self.request_info(ctx, 'How many songs would you like to add to album {0}?'.format(name.title()))
 
-            for i in range(numsongs):
+            for i in range(int(numsongs)):
                 # Get title
                 await ctx.message.channel.send('Song {0} of {1}:'.format(i+1,numsongs))
                 #await ctx.message.channel.send('What is the song called?')
@@ -302,8 +307,8 @@ class Music(commands.Cog):
                 link = await self.request_info(ctx, 'What is the link to the song?')#self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
 
                 # Cut link to get unique key
-                cut = link.content.find('=')+1
-                key = link.content[cut:]
+                cut = link.find('=')+1
+                key = link[cut:]
 
                 # Attempt download
                 await ctx.message.channel.send('Downloading...')
@@ -419,7 +424,7 @@ class Music(commands.Cog):
 
         try:
             query = "update {0} set {1} = {2} where {1} = {3}"
-            self.cur.execute(query.format(request[2], edit_a, edit_c, edit,b)
+            self.cur.execute(query.format(request[2], edit_a, edit_c, edit,b))
 
         except psycopg2.Error as e:
             await ctx.message.channel.send('Insert error...')
