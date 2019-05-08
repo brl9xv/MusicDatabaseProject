@@ -34,7 +34,7 @@ create table music (
 );
 
 create table playlist (
-	name varchar(63) not null unique,
+	name varchar(63) not null,
 	key varchar(11) references music(key)
 );
 

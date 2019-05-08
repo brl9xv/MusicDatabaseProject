@@ -102,7 +102,6 @@ class Music(commands.Cog):
     async def request_info(self, ctx, content):
         await ctx.message.channel.send(content)
         request_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
-        print(request_m.content[:5])
         if request_m.content[:5] == 'https':
             return (request_m.content)
         return (request_m.content).lower()
@@ -403,7 +402,8 @@ class Music(commands.Cog):
             else:
                 await ctx.message.channel.send('Try "ia delete [song | album | artist | label | playlist ] ["name"]"')
                 return
-
+            
+            self.con.commit()
             await ctx.message.channel.send("Deletion successful!")
             
         # If deletion fails
@@ -443,11 +443,15 @@ class Music(commands.Cog):
         
         request = await self.string_split(ctx.message.content)
 
-        if (len(request) < 5 and request[2] == 'add'):
+        if len(request) == 2:
+            await ctx.message.channel.send('Try "ia playlist add [playlist_name] [song]" or "ia playlist play [playlist_name]"')
+            return
+
+        elif (len(request) < 5 and request[2] == 'add'):
             await ctx.message.channel.send('Try "ia playlist add [playlist_name] [song]"')
             return
 
-        if (len(request) < 4 and request[2] == 'play'):
+        elif (len(request) < 4 and request[2] == 'play'):
             await ctx.message.channel.send('Try "ia playlist play [playlist_name]"')
             return
 
@@ -488,6 +492,7 @@ class Music(commands.Cog):
                     self.cur.execute("insert into playlist values('{0}', '{1}';".format(request[3], results[int(choice)-1][2]))
         
                 self.con.commit()
+
                 await ctx.message.channel.send('Insertion successful!')
             except psycopg2.Error as e:
                 await ctx.message.channel.send('Insert error...')
@@ -495,12 +500,16 @@ class Music(commands.Cog):
                 print(e)
 
         # play section for playlist function    #
-        if request[2] == 'play':
+        elif request[2] == 'play':
             try:
                 self.channel = ctx.message.channel
                 self.cur.execute("select m.title, m.artist, m.key from playlist as p, music as m where p.name = '{0}' and p.key = m.key;".format(request[3]))
 
                 results = self.cur.fetchall()
+
+                if len(results) < 1:
+                    await ctx.message.channel.send('Playlist does not exist, please make a playlist or play an existing one')
+                    return
 
                 for r in results:
                     await self.queue_paths.put("Music/"+r[2]+".m4a")
@@ -508,8 +517,13 @@ class Music(commands.Cog):
 
             except psycopg2.Error as e:
                 await ctx.message.channel.send('Retrival error...')
+                await ctx.message.channel.send('Make sure that {0} exists'.format(request[3]))
                 self.con.rollback()
                 print(e)
+
+        else:
+            await ctx.message.channel.send('Try "ia playlist add [playlist_name] [song]" or "ia playlist play [playlist_name]"')
+            return
 
 
 
