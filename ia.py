@@ -415,23 +415,103 @@ class Music(commands.Cog):
 
     @commands.command(pass_context=True, no_pm=True)
     async def edit(self, ctx):
-
-        request = await self.string_split(ctx.message.content)
-        
-        edit_a = await self.request_info(ctx, 'Which column would you like to apply the changes to?')
-        edit_b = await self.request_info(ctx, 'Which value would you like to change?')
-        edit_c = await self.request_info(ctx, 'What would you like to change it to?')
-
         try:
-            query = "update {0} set {1} = {2} where {1} = {3}"
-            self.cur.execute(query.format(request[2], edit_a, edit_c, edit,b))
+
+            request = await self.string_split(ctx.message.content)
+
+            if len(request) < 6:
+                await ctx.message.channel.send('Try "ia edit [music | album | artist| label | playlist] [column] ["variable_to_change"] ["change_variable_to"]"')
+                return
+            
+            self.cur.execute("update {0} set {1} = '{2}' where {1} = '{3}';".format(request[2], request[3], request[5], request[4]))
+
+
+            self.con.commit()
+            await ctx.message.channel.send("Edit successful!")
+        
 
         except psycopg2.Error as e:
-            await ctx.message.channel.send('Insert error...')
+            await ctx.message.channel.send('Edit error...')
+            await ctx.message.channel.send('Make sure that {0} exists'.format(request[4]))
             self.con.rollback()
             print(e)
 
         return
+
+    @commands.command(pass_contex=True, no_pm=True)
+    async def playlist(self, ctx):
+        
+        request = await self.string_split(ctx.message.content)
+
+        if (len(request) < 5 and request[2] == 'add'):
+            await ctx.message.channel.send('Try "ia playlist add [playlist_name] [song]"')
+            return
+
+        if (len(request) < 4 and request[2] == 'play'):
+            await ctx.message.channel.send('Try "ia playlist play [playlist_name]"')
+            return
+
+        if request[2] == 'add':
+
+            for i in range(len(request)-5):
+                request[4] += (' '+request[5+i])
+
+            self.cur.execute("select title, artist, key from music where title like '{0}';".format(request[4]))
+
+            results = self.cur.fetchall()
+
+            try:
+
+                # No results
+                if len(results) < 1:
+                    await ctx.message.channel.send('No results...')
+                    return
+
+                # Exactly one result
+                elif len(results) == 1:
+                    await ctx.message.channel.send('Adding to playlist: '+results[0][0]+" - "+results[0][1])
+                    self.cur.execute("insert into playlist values ('{0}', '{1}');".format(request[3], results[0][2]))
+                
+
+                # Multiple results
+                else:
+                    await ctx.message.channel.send('Multiple results, pick a number or all...')
+                    all_results = ''
+                    for i in range(len(results)):
+                        all_results += str(i+1)+': '+results[i][0]+' - '+results[i][1]+'\n'
+                    await ctx.message.channel.send( all_results)
+                    choice_m = await self.bot.wait_for('message', check=lambda m: m.author==ctx.message.author)
+                    choice = choice_m.content
+                        
+                    # Play one result
+                    await ctx.message.channel.send('Enqueing: '+results[int(choice)-1][0])
+                    self.cur.execute("insert into playlist values('{0}', '{1}';".format(request[3], results[int(choice)-1][2]))
+        
+                self.con.commit()
+                await ctx.message.channel.send('Insertion successful!')
+            except psycopg2.Error as e:
+                await ctx.message.channel.send('Insert error...')
+                self.con.rollback()
+                print(e)
+
+        # play section for playlist function    #
+        if request[2] == 'play':
+            try:
+                self.channel = ctx.message.channel
+                self.cur.execute("select m.title, m.artist, m.key from playlist as p, music as m where p.name = '{0}' and p.key = m.key;".format(request[3]))
+
+                results = self.cur.fetchall()
+
+                for r in results:
+                    await self.queue_paths.put("Music/"+r[2]+".m4a")
+                    self.queue_titles.append([r[0].title(),r[1].title()])
+
+            except psycopg2.Error as e:
+                await ctx.message.channel.send('Retrival error...')
+                self.con.rollback()
+                print(e)
+
+
 
 #***********************************************************************************#
 #                               Media Control Commands                              #
@@ -486,7 +566,7 @@ class Music(commands.Cog):
                 self.cur.execute("select distinct genre from genre where genre like '{0}';".format(request[3]))
 
             elif request[2] == 'song':
-                self.cur.execute("select distinct title, artist, key from music where title like '{0}';".format(request[3]))
+                self.cur.execute("select title, artist, key from music where title like '{0}';".format(request[3]))
 
             # Handle incorrect usage
             else:
